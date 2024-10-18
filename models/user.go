@@ -1,11 +1,10 @@
 package models
 
-type Address struct {
-	State string `json:"statw" bson:"user_state"`
-	City  string `json:"city" bson:"user_city"`
-}
+import "go.mongodb.org/mongo-driver/bson/primitive"
+
 type User struct {
-	Name    string  `json:"name" bson:"user_name"`
-	Age     int     `json:"age" bson:"user_age"`
-	Address Address `json:"address" bson:"user_address"`
+	ID       primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name     string             `json:"name" bson:"name"`
+	Email    string             `json:"email" bson:"email"`
+	Password string             `json:"password" bson:"password"`
 }
