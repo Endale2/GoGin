@@ -8,14 +8,12 @@ import (
 )
 
 func main() {
-	app := gin.Default()
+	r := gin.Default()
 
-	// MongoDB connection
 	config.ConnectDB()
 
-	// Setup routes
-	routes.UserRoutes(app)
+	routes.AuthRoutes(r)
+	routes.RecipeRoutes(r)
 
-	// Start server
-	app.Run(":8080")
+	r.Run(":8080")
 }
