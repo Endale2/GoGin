@@ -16,8 +16,8 @@ func AuthRoutes(r *gin.Engine) {
 	authorized := r.Group("/")
 	authorized.Use(middleware.AuthMiddleware())
 	{
-		// Protected routes go here
-		authorized.POST("/recipes", controllers.CreateRecipe) // Example protected route
-		authorized.GET("/recipes", controllers.GetRecipes)    // Example protected route
+		// // Protected routes go here
+		// authorized.POST("/recipes", controllers.CreateRecipe) // Example protected route
+		// authorized.GET("/recipes", controllers.GetRecipes)    // Example protected route
 	}
 }
