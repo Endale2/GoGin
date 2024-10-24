@@ -34,6 +34,5 @@ func main() {
 	routes.RecipeRoutes(r)
 	routes.QuestionRoutes(r)
 
-	// Start the server on port 8080
 	r.Run(":8080")
 }
