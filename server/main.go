@@ -11,7 +11,7 @@ import (
 func main() {
 	app := gin.Default()
 
-	// CORS configuration
+	// CORS configuration,,, we can also write cors conf in separate file
 	corsConfig := cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"}, // Frontend URL
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
