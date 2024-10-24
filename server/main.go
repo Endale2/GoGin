@@ -9,10 +9,7 @@ import (
 )
 
 func main() {
-	r := gin.Default()
-
-	// Set trusted proxies if you're behind a proxy
-	r.SetTrustedProxies([]string{"127.0.0.1"}) // Optional if behind a proxy
+	app := gin.Default()
 
 	// CORS configuration
 	corsConfig := cors.Config{
@@ -24,15 +21,15 @@ func main() {
 	}
 
 	// Apply the CORS middleware
-	r.Use(cors.New(corsConfig))
+	app.Use(cors.New(corsConfig))
 
 	// Database connection
 	config.ConnectDB()
 
 	// Routes
-	routes.AuthRoutes(r)
-	routes.RecipeRoutes(r)
-	routes.QuestionRoutes(r)
+	routes.AuthRoutes(app)
+	routes.RecipeRoutes(app)
+	routes.QuestionRoutes(app)
 
-	r.Run(":8080")
+	app.Run(":8080")
 }
