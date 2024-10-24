@@ -11,15 +11,19 @@ import (
 func main() {
 	r := gin.Default()
 
-	// Updated CORS configuration to allow only the frontend origin
+	// Set trusted proxies if you're behind a proxy
+	r.SetTrustedProxies([]string{"127.0.0.1"}) // Optional if behind a proxy
+
+	// CORS configuration
 	corsConfig := cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"}, // Explicitly allow only your frontend
+		AllowOrigins:     []string{"http://localhost:5173"}, // Frontend URL
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true, // Enable credentials (cookies, etc.)
+		AllowCredentials: true, // Important for sending cookies
 	}
 
+	// Apply the CORS middleware
 	r.Use(cors.New(corsConfig))
 
 	// Database connection
@@ -28,6 +32,7 @@ func main() {
 	// Routes
 	routes.AuthRoutes(r)
 	routes.RecipeRoutes(r)
+	routes.QuestionRoutes(r)
 
 	// Start the server on port 8080
 	r.Run(":8080")

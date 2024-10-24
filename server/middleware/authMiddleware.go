@@ -3,33 +3,29 @@ package middleware
 import (
 	"go-gin/controllers"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
+// AuthMiddleware is the JWT authentication middleware
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-			c.Abort()
-			return
-		}
-
-		// Extract the token from the "Bearer" scheme
-		tokenString := strings.Split(authHeader, "Bearer ")[1]
-
-		// Verify the token
-		claims, err := controllers.VerifyToken(tokenString)
+		accessToken, err := c.Cookie("access_token")
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized - invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "you have to login with correct credentials to access this page"})
 			c.Abort()
 			return
 		}
 
-		// Set the user ID from the token claims
-		c.Set("userID", claims.Subject)
+		claims, err := controllers.VerifyJWT(accessToken)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired access token"})
+			c.Abort()
+			return
+		}
+
+		// Set user ID in context
+		c.Set("userID", claims.UserID)
 		c.Next()
 	}
 }

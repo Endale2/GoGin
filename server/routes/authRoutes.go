@@ -7,17 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoutes(r *gin.Engine) {
-	// Public routes
-	r.POST("/register", controllers.Register)
-	r.POST("/login", controllers.Login)
-
-	// Group for protected routes
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddleware())
+func AuthRoutes(router *gin.Engine) {
+	auth := router.Group("/auth")
 	{
-		// // Protected routes go here
-		// authorized.POST("/recipes", controllers.CreateRecipe) // Example protected route
-		// authorized.GET("/recipes", controllers.GetRecipes)    // Example protected route
+		auth.POST("/register", controllers.Register)
+		auth.POST("/login", controllers.Login)
+		auth.POST("/logout", middleware.AuthMiddleware(), controllers.Logout)
+		auth.GET("/me", middleware.AuthMiddleware(), controllers.GetCurrentUser)
 	}
 }

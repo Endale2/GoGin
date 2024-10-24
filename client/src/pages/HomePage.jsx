@@ -10,9 +10,8 @@ function HomePage() {
       try {
         const accessToken = localStorage.getItem('accessToken');
         const response = await axios.get('http://localhost:8080/recipes', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          withCredentials:true
+         
         });
 
         setRecipes(response.data);
