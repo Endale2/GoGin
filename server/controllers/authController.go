@@ -95,10 +95,13 @@ func Login(c *gin.Context) {
 	}
 
 	// Set tokens in HTTP-only cookies
+	// Example for setting cookies
+	// In Login and RefreshToken functions, set SameSite and Secure options
 	c.SetCookie("access_token", accessToken, int(accessTokenExpiry.Seconds()), "/", "", false, true)
 	c.SetCookie("refresh_token", refreshToken, int(refreshTokenExpiry.Seconds()), "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+	println("Login successful")
 }
 
 // CreateJWT generates a JWT token for the user

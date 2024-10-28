@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+ // Assume axios is exported as axiosInstance
 
 function HomePage() {
   const [recipes, setRecipes] = useState([]);
@@ -8,30 +8,12 @@ function HomePage() {
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        const accessToken = localStorage.getItem('accessToken');
-        const response = await axios.get('http://localhost:8080/recipes', {
-          withCredentials:true
-         
+        const response = await axios.get('http://localhost:8080/recipes/', {
+          withCredentials: true
         });
-
         setRecipes(response.data);
       } catch (err) {
-        if (err.response.status === 401) {
-          const refreshToken = localStorage.getItem('refreshToken');
-          // Try refreshing the access token
-          try {
-            const refreshResponse = await axios.post('http://localhost:8080/refresh', {
-              refreshToken,
-            });
-
-            localStorage.setItem('accessToken', refreshResponse.data.accessToken);
-            fetchRecipes(); // Retry the original request
-          } catch (refreshError) {
-            setError('Session expired. Please log in again.');
-          }
-        } else {
-          setError('Failed to fetch recipes. Please try again later.');
-        }
+        setError('Failed to fetch recipes. Please try again later.');
       }
     };
 
@@ -47,7 +29,7 @@ function HomePage() {
       ) : (
         <ul>
           {recipes.map((recipe, index) => (
-            <li key={index}>{recipe.name}</li>
+            <li key={index}>{recipe.Title}</li>
           ))}
         </ul>
       )}

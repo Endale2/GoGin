@@ -11,18 +11,16 @@ import (
 func main() {
 	app := gin.Default()
 
-	// CORS configuration,,, we can also write cors conf in separate file
-	corsConfig := cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"}, // Frontend URL
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
-	}
+	}))
 
-	// Apply the CORS middleware
-	app.Use(cors.New(corsConfig))
-
+	app.GET("/test-cors", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "CORS is working!"})
+	})
 	// Database connection
 	config.ConnectDB()
 

@@ -2,7 +2,6 @@ package routes
 
 import (
 	"go-gin/controllers"
-
 	"go-gin/middleware"
 
 	"github.com/gin-gonic/gin"
