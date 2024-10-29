@@ -59,7 +59,7 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully!"})
 }
 
-// Login handles user authentication and returns JWT tokens as HTTP-only cookies
+// Login handles user authentication and returns JWT tokens
 func Login(c *gin.Context) {
 	var user models.User
 	var foundUser models.User
@@ -82,26 +82,23 @@ func Login(c *gin.Context) {
 	}
 
 	// Create JWT access and refresh tokens
-	accessToken, accessTokenExpiry, err := CreateJWT(foundUser.ID.Hex(), 15*time.Minute)
+	accessToken, _, err := CreateJWT(foundUser.ID.Hex(), 15*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create access token"})
 		return
 	}
 
-	refreshToken, refreshTokenExpiry, err := CreateJWT(foundUser.ID.Hex(), 7*24*time.Hour)
+	refreshToken, _, err := CreateJWT(foundUser.ID.Hex(), 7*24*time.Hour)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create refresh token"})
 		return
 	}
 
-	// Set tokens in HTTP-only cookies
-	// Example for setting cookies
-	// In Login and RefreshToken functions, set SameSite and Secure options
-	c.SetCookie("access_token", accessToken, int(accessTokenExpiry.Seconds()), "/", "", false, true)
-	c.SetCookie("refresh_token", refreshToken, int(refreshTokenExpiry.Seconds()), "/", "", false, true)
-
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
-	println("Login successful")
+	// Send tokens in JSON response
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken":  accessToken,
+		"refreshToken": refreshToken,
+	})
 }
 
 // CreateJWT generates a JWT token for the user
@@ -125,8 +122,8 @@ func CreateJWT(userID string, duration time.Duration) (string, time.Duration, er
 
 // RefreshToken generates a new access token if refresh token is valid
 func RefreshToken(c *gin.Context) {
-	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil {
+	refreshToken := c.GetHeader("Authorization")
+	if refreshToken == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing refresh token"})
 		return
 	}
@@ -137,14 +134,13 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessTokenExpiry, err := CreateJWT(claims.UserID, 15*time.Minute)
+	accessToken, _, err := CreateJWT(claims.UserID, 15*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create access token"})
 		return
 	}
 
-	c.SetCookie("access_token", accessToken, int(accessTokenExpiry.Seconds()), "/", "", false, true)
-	c.JSON(http.StatusOK, gin.H{"message": "Access token refreshed"})
+	c.JSON(http.StatusOK, gin.H{"accessToken": accessToken})
 }
 
 // VerifyJWT validates the JWT token
@@ -162,32 +158,25 @@ func VerifyJWT(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// Logout clears the JWT cookies
+// Logout clears the tokens on the frontend by instructing the client
 func Logout(c *gin.Context) {
-	// Clear the cookies by setting their values to empty and expiring them
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
-
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully. Clear tokens on the client-side."})
 }
 
 // GetCurrentUser retrieves the current user's data based on the JWT token
 func GetCurrentUser(c *gin.Context) {
-	// Get the access token from the cookie
-	accessToken, err := c.Cookie("access_token")
-	if err != nil {
+	accessToken := c.GetHeader("Authorization")
+	if accessToken == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing access token"})
 		return
 	}
 
-	// Verify the JWT token
 	claims, err := VerifyJWT(accessToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired access token"})
 		return
 	}
 
-	// Connect to the database and retrieve the user's information
 	collection := config.DB.Collection("users")
 	var user models.User
 	objectID, err := primitive.ObjectIDFromHex(claims.UserID)
@@ -202,9 +191,6 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	// Remove sensitive information such as password
 	user.Password = ""
-
-	// Send the user data as a JSON response
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }

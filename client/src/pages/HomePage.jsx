@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
- // Assume axios is exported as axiosInstance
+import axios from 'axios'; // Ensure axios is imported correctly
 
 function HomePage() {
   const [recipes, setRecipes] = useState([]);
@@ -8,11 +8,11 @@ function HomePage() {
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/recipes/', {
-          withCredentials: true
-        });
+        const response = await axios.get('http://localhost:8080/recipes/');
+        console.log('Response:', response.data); // Log the response
         setRecipes(response.data);
       } catch (err) {
+        console.error('Error fetching recipes:', err); // Log the error
         setError('Failed to fetch recipes. Please try again later.');
       }
     };
