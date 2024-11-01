@@ -1,60 +1,71 @@
+// src/pages/RegistrationPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 
-function RegisterPage() {
+const RegisterPage = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const navigate = useNavigate(); // Hook for programmatic navigation
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError(null); // Clear any previous errors
+
     try {
-      const response = await axios.post('http://localhost:8080/auth/register', {
-        email,
-        password,
-      });
-      
-      if (response.status === 200) {
-        // Redirect to the home page on success
-        navigate('/home');
-      }
+      // Submit registration data to the backend
+      await axiosInstance.post('/auth/register', { name, email, password });
+      // Redirect to login page after successful registration
+      navigate('/login');
     } catch (err) {
-      // Handle registration error
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      console.error('Registration failed', err);
+      setError('Registration failed. Please try again.');
     }
   };
 
   return (
-    <div>
-      <h1>Register</h1>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <div style={{ padding: '20px', maxWidth: '400px', margin: '0 auto' }}>
+      <h2>Register</h2>
       <form onSubmit={handleSubmit}>
-        <div>
+        <div style={{ marginBottom: '10px' }}>
+          <label>Name:</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            style={{ width: '100%', padding: '8px' }}
+          />
+        </div>
+        <div style={{ marginBottom: '10px' }}>
           <label>Email:</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            style={{ width: '100%', padding: '8px' }}
           />
         </div>
-        <div>
+        <div style={{ marginBottom: '10px' }}>
           <label>Password:</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            style={{ width: '100%', padding: '8px' }}
           />
         </div>
-        <button type="submit">Register</button>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer' }}>
+          Register
+        </button>
       </form>
     </div>
   );
-}
+};
 
 export default RegisterPage;

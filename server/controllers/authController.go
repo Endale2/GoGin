@@ -16,16 +16,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Secret key for signing JWTs
 var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-// Claims defines JWT structure
 type Claims struct {
 	UserID string `json:"userId"`
 	jwt.StandardClaims
 }
 
-// Register handles user registration
 func Register(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -59,7 +56,6 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully!"})
 }
 
-// Login handles user authentication and returns JWT tokens
 func Login(c *gin.Context) {
 	var user models.User
 	var foundUser models.User
@@ -71,37 +67,29 @@ func Login(c *gin.Context) {
 
 	collection := config.DB.Collection("users")
 	err := collection.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&foundUser)
-	if err != nil {
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(user.Password)) != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(user.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
-		return
-	}
-
-	// Create JWT access and refresh tokens
-	accessToken, _, err := CreateJWT(foundUser.ID.Hex(), 15*time.Minute)
+	accessToken, accessDuration, err := CreateJWT(foundUser.ID.Hex(), 15*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create access token"})
 		return
 	}
 
-	refreshToken, _, err := CreateJWT(foundUser.ID.Hex(), 7*24*time.Hour)
+	refreshToken, refreshDuration, err := CreateJWT(foundUser.ID.Hex(), 7*24*time.Hour)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create refresh token"})
 		return
 	}
 
-	// Send tokens in JSON response
-	c.JSON(http.StatusOK, gin.H{
-		"accessToken":  accessToken,
-		"refreshToken": refreshToken,
-	})
+	c.SetCookie("accessToken", accessToken, int(accessDuration.Seconds()), "/", "localhost", false, true)
+	c.SetCookie("refreshToken", refreshToken, int(refreshDuration.Seconds()), "/", "localhost", false, true)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Login successful!"})
 }
 
-// CreateJWT generates a JWT token for the user
 func CreateJWT(userID string, duration time.Duration) (string, time.Duration, error) {
 	expirationTime := time.Now().Add(duration)
 	claims := &Claims{
@@ -120,11 +108,10 @@ func CreateJWT(userID string, duration time.Duration) (string, time.Duration, er
 	return tokenString, duration, nil
 }
 
-// RefreshToken generates a new access token if refresh token is valid
 func RefreshToken(c *gin.Context) {
-	refreshToken := c.GetHeader("Authorization")
-	if refreshToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing refresh token"})
+	refreshToken, err := c.Cookie("refreshToken")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token missing"})
 		return
 	}
 
@@ -134,16 +121,16 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, _, err := CreateJWT(claims.UserID, 15*time.Minute)
+	accessToken, accessDuration, err := CreateJWT(claims.UserID, 15*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create access token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"accessToken": accessToken})
+	c.SetCookie("accessToken", accessToken, int(accessDuration.Seconds()), "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{"message": "Access token refreshed"})
 }
 
-// VerifyJWT validates the JWT token
 func VerifyJWT(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 
@@ -158,16 +145,16 @@ func VerifyJWT(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// Logout clears the tokens on the frontend by instructing the client
 func Logout(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully. Clear tokens on the client-side."})
+	c.SetCookie("accessToken", "", -1, "/", "localhost", false, true)
+	c.SetCookie("refreshToken", "", -1, "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// GetCurrentUser retrieves the current user's data based on the JWT token
 func GetCurrentUser(c *gin.Context) {
-	accessToken := c.GetHeader("Authorization")
-	if accessToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing access token"})
+	accessToken, err := c.Cookie("accessToken")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Access token missing"})
 		return
 	}
 

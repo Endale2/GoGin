@@ -1,40 +1,44 @@
+// src/pages/HomePage.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios'; // Ensure axios is imported correctly
+import axiosInstance from '../utils/axios';
 
-function HomePage() {
-  const [recipes, setRecipes] = useState([]);
-  const [error, setError] = useState('');
+const HomePage = () => {
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const fetchRecipes = async () => {
+    const fetchUserData = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/recipes/');
-        console.log('Response:', response.data); // Log the response
-        setRecipes(response.data);
-      } catch (err) {
-        console.error('Error fetching recipes:', err); // Log the error
-        setError('Failed to fetch recipes. Please try again later.');
+        const { data } = await axiosInstance.get('/auth/me');
+        setUser(data.user); // Update based on the "user" object structure from the response
+      } catch (error) {
+        console.error('Failed to fetch user data', error);
       }
     };
 
-    fetchRecipes();
+    fetchUserData();
   }, []);
 
+  // Format the joined date
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
   return (
-    <div>
-      <h1>This is the homepage</h1>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {recipes.length === 0 ? (
-        <p>No recipes available.</p>
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+      {user ? (
+        <>
+          <h1>Welcome, {user.name || 'User'}</h1>
+          <p><strong>ID:</strong> {user.id}</p>
+          <p><strong>Email:</strong> {user.email}</p>
+          <p><strong>Joined At:</strong> {formatDate(user.joined_at)}</p>
+          <p><strong>Added Courses:</strong> {user.added_courses ? user.added_courses : 'No courses added'}</p>
+        </>
       ) : (
-        <ul>
-          {recipes.map((recipe, index) => (
-            <li key={index}>{recipe.Title}</li>
-          ))}
-        </ul>
+        <p>Loading user data...</p>
       )}
     </div>
   );
-}
+};
 
 export default HomePage;
