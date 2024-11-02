@@ -1,4 +1,3 @@
-// src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from 'react';
 import axios from '../utils/axios';
 
@@ -7,7 +6,6 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  // Check if user is already logged in when the app starts
   useEffect(() => {
     axios.get('/auth/me').then((res) => {
       setUser(res.data);
