@@ -26,6 +26,7 @@ func main() {
 
 	// Routes
 	routes.AuthRoutes(app)
+	routes.CourseRoutes(app)
 	routes.RecipeRoutes(app)
 	routes.QuestionRoutes(app)
 
