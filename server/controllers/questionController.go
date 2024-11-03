@@ -12,11 +12,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// GetQuestions handles fetching all questions
-func GetQuestions(c *gin.Context) {
-	collection := config.DB.Collection("questions")
+// Define a struct for safe user output, excluding sensitive fields like password
+type SafeUser struct {
+	ID       primitive.ObjectID `json:"id"`
+	Name     string             `json:"name"`
+	Email    string             `json:"email"`
+	JoinedAt time.Time          `json:"joined_at"`
+}
 
-	cursor, err := collection.Find(context.Background(), bson.M{})
+// Define a struct to include the question with safe user data embedded
+type QuestionWithUser struct {
+	models.Question
+	User SafeUser `json:"user"`
+}
+
+func GetQuestions(c *gin.Context) {
+	questionCollection := config.DB.Collection("questions")
+	userCollection := config.DB.Collection("users")
+
+	cursor, err := questionCollection.Find(context.Background(), bson.M{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch questions"})
 		return
@@ -29,7 +43,65 @@ func GetQuestions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, questions)
+	var questionsWithUserData []QuestionWithUser
+	for _, question := range questions {
+		var user models.User
+		err := userCollection.FindOne(context.Background(), bson.M{"_id": question.UserID}).Decode(&user)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching user information"})
+			return
+		}
+
+		// Embed only the safe user data
+		questionsWithUserData = append(questionsWithUserData, QuestionWithUser{
+			Question: question,
+			User: SafeUser{
+				ID:       user.ID,
+				Name:     user.Name,
+				Email:    user.Email,
+				JoinedAt: user.JoinedAt,
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, questionsWithUserData)
+}
+
+func GetQuestionByID(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var question models.Question
+	questionCollection := config.DB.Collection("questions")
+	err = questionCollection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&question)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Question not found"})
+		return
+	}
+
+	var user models.User
+	userCollection := config.DB.Collection("users")
+	err = userCollection.FindOne(context.Background(), bson.M{"_id": question.UserID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching user information"})
+		return
+	}
+
+	questionWithUserData := QuestionWithUser{
+		Question: question,
+		User: SafeUser{
+			ID:       user.ID,
+			Name:     user.Name,
+			Email:    user.Email,
+			JoinedAt: user.JoinedAt,
+		},
+	}
+
+	c.JSON(http.StatusOK, questionWithUserData)
 }
 
 // CreateQuestion handles creating a new question
@@ -64,26 +136,6 @@ func CreateQuestion(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, question)
-}
-
-// GetQuestionByID retrieves a question by ID
-func GetQuestionByID(c *gin.Context) {
-	id := c.Param("id")
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-		return
-	}
-
-	var question models.Question
-	collection := config.DB.Collection("questions")
-	err = collection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&question)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Question not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, question)
 }
 
 // UpdateQuestion updates a question by ID

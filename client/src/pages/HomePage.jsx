@@ -4,6 +4,8 @@ import axiosInstance from '../utils/axios';
 const HomePage = () => {
   const [user, setUser] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState("");
   const [newQuestionContent, setNewQuestionContent] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -11,7 +13,7 @@ const HomePage = () => {
     const fetchUserData = async () => {
       try {
         const { data } = await axiosInstance.get('/auth/me');
-        setUser(data.user); 
+        setUser(data.user);
       } catch (error) {
         console.error('Failed to fetch user data', error);
       }
@@ -28,8 +30,18 @@ const HomePage = () => {
       }
     };
 
+    const fetchCourses = async () => {
+      try {
+        const { data } = await axiosInstance.get('http://localhost:8080/courses/');
+        setCourses(data);
+      } catch (error) {
+        console.error('Failed to fetch courses', error);
+      }
+    };
+
     fetchUserData();
     fetchQuestions();
+    fetchCourses();
   }, []);
 
   const handleCreateQuestion = async (e) => {
@@ -37,11 +49,12 @@ const HomePage = () => {
     try {
       const newQuestion = {
         content: newQuestionContent,
-        course_id: "6716017f96328fd17963366e" // Replace with an actual course ID
+        course_id: selectedCourseId,
       };
       const { data } = await axiosInstance.post('http://localhost:8080/questions/', newQuestion);
       setQuestions([...questions, data]);
       setNewQuestionContent("");
+      setSelectedCourseId("");
     } catch (error) {
       console.error("Failed to create question", error);
     }
@@ -50,6 +63,11 @@ const HomePage = () => {
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const getCourseNameById = (courseId) => {
+    const course = courses.find((course) => course.id === courseId);
+    return course ? course.title : "Unknown Course";
   };
 
   return (
@@ -78,9 +96,15 @@ const HomePage = () => {
               margin: '10px 0',
               boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
             }}>
+              <div style={{ marginBottom: '10px' }}>
+                <p style={{ fontWeight: 'bold', color: '#333' }}>{question.user.name || "Anonymous"}</p>
+                <p><strong>Email:</strong> {question.user.email}</p>
+                <p><strong>Department:</strong> {question.user.department || "N/A"}</p>
+                <p><strong>Joined At:</strong> {formatDate(question.user.joined_at)}</p>
+              </div>
               <h3>{question.content}</h3>
+              <p><strong>Course:</strong> {getCourseNameById(question.course_id)}</p>
               <p><strong>Created At:</strong> {formatDate(question.created_at)}</p>
-              <p><strong>User ID:</strong> {question.user_id}</p>
             </div>
           ))
         ) : (
@@ -98,6 +122,19 @@ const HomePage = () => {
           style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
           required
         />
+        <select
+          value={selectedCourseId}
+          onChange={(e) => setSelectedCourseId(e.target.value)}
+          style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
+          required
+        >
+          <option value="">Select a course</option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.title}
+            </option>
+          ))}
+        </select>
         <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer' }}>
           Create Question
         </button>
