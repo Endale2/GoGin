@@ -5,11 +5,13 @@ import LoginPage from './pages/LoginPage';
 import RegistrationPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ProtectedRoute from './components/ProtectedRoute';
+import LandingPage from './pages/LandingPage'
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<LandingPage/>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegistrationPage />} />
         <Route
