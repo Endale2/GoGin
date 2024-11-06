@@ -71,61 +71,55 @@ const HomePage = () => {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="p-8 max-w-2xl mx-auto">
       {user ? (
-        <div>
-          <h1>Welcome, {user.name || 'User'}</h1>
-          <p><strong>ID:</strong> {user.id}</p>
-          <p><strong>Email:</strong> {user.email}</p>
-          <p><strong>Joined At:</strong> {formatDate(user.joined_at)}</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold">Welcome, {user.name || 'User'}</h1>
+          <p className="text-gray-600"><strong>ID:</strong> {user.id}</p>
+          <p className="text-gray-600"><strong>Email:</strong> {user.email}</p>
+          <p className="text-gray-600"><strong>Joined At:</strong> {formatDate(user.joined_at)}</p>
         </div>
       ) : (
-        <p>Loading user data...</p>
+        <p className="text-center text-gray-500">Loading user data...</p>
       )}
 
-      <h2>Questions</h2>
+      <h2 className="text-xl font-semibold mb-4">Questions</h2>
       {loading ? (
-        <p>Loading questions...</p>
+        <p className="text-center text-gray-500">Loading questions...</p>
       ) : (
         questions.length > 0 ? (
           questions.map((question) => (
-            <div key={question.id} style={{
-              border: '1px solid #ddd',
-              borderRadius: '5px',
-              padding: '15px',
-              margin: '10px 0',
-              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-            }}>
-              <div style={{ marginBottom: '10px' }}>
-                <p style={{ fontWeight: 'bold', color: '#333' }}>{question.user.name || "Anonymous"}</p>
-                <p><strong>Email:</strong> {question.user.email}</p>
-                <p><strong>Department:</strong> {question.user.department || "N/A"}</p>
-                <p><strong>Joined At:</strong> {formatDate(question.user.joined_at)}</p>
+            <div key={question.id} className="border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
+              <div className="mb-2">
+                <p className="font-semibold text-gray-800">{question.user.name || "Anonymous"}</p>
+                <p className="text-gray-600"><strong>Email:</strong> {question.user.email}</p>
+                <p className="text-gray-600"><strong>Department:</strong> {question.user.department || "N/A"}</p>
+                <p className="text-gray-600"><strong>Joined At:</strong> {formatDate(question.user.joined_at)}</p>
               </div>
-              <h3>{question.content}</h3>
-              <p><strong>Course:</strong> {getCourseNameById(question.course_id)}</p>
-              <p><strong>Created At:</strong> {formatDate(question.created_at)}</p>
+              <h3 className="text-lg font-bold text-blue-600">{question.content}</h3>
+              <p className="text-gray-600"><strong>Course:</strong> {getCourseNameById(question.course_id)}</p>
+              <p className="text-gray-500"><strong>Created At:</strong> {formatDate(question.created_at)}</p>
             </div>
           ))
         ) : (
-          <p>No questions available</p>
+          <p className="text-center text-gray-500">No questions available</p>
         )
       )}
 
-      <h2>Create a New Question</h2>
-      <form onSubmit={handleCreateQuestion}>
+      <h2 className="text-xl font-semibold mt-8 mb-4">Create a New Question</h2>
+      <form onSubmit={handleCreateQuestion} className="space-y-4">
         <textarea
           placeholder="Enter your question content here"
           value={newQuestionContent}
           onChange={(e) => setNewQuestionContent(e.target.value)}
           rows="4"
-          style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
+          className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:ring-blue-200"
           required
         />
         <select
           value={selectedCourseId}
           onChange={(e) => setSelectedCourseId(e.target.value)}
-          style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
+          className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:ring-blue-200"
           required
         >
           <option value="">Select a course</option>
@@ -135,7 +129,7 @@ const HomePage = () => {
             </option>
           ))}
         </select>
-        <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer' }}>
+        <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring focus:ring-blue-300">
           Create Question
         </button>
       </form>
