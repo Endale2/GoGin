@@ -18,9 +18,6 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	app.GET("/test-cors", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "CORS is working!"})
-	})
 	// Database connection
 	config.ConnectDB()
 

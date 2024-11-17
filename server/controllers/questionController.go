@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Define a struct for safe user output, excluding sensitive fields like password
+// excluding sensitive fields
 type SafeUser struct {
 	ID       primitive.ObjectID `json:"id"`
 	Name     string             `json:"name"`
@@ -20,7 +20,6 @@ type SafeUser struct {
 	JoinedAt time.Time          `json:"joined_at"`
 }
 
-// Define a struct to include the question with safe user data embedded
 type QuestionWithUser struct {
 	models.Question
 	User SafeUser `json:"user"`
