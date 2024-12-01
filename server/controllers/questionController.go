@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // excluding sensitive fields
@@ -29,7 +30,11 @@ func GetQuestions(c *gin.Context) {
 	questionCollection := config.DB.Collection("questions")
 	userCollection := config.DB.Collection("users")
 
-	cursor, err := questionCollection.Find(context.Background(), bson.M{})
+	// Add sort option to order by `created_at` in descending order
+	findOptions := options.Find()
+	findOptions.SetSort(bson.D{{Key: "created_at", Value: -1}})
+
+	cursor, err := questionCollection.Find(context.Background(), bson.M{}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch questions"})
 		return
