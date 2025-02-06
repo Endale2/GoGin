@@ -1,3 +1,4 @@
+// App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
@@ -5,6 +6,7 @@ import RegistrationPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
+import QuestionDetail from './pages/QuestionDetail';
 import Layout from './components/Layout';
 
 function App() {
@@ -23,6 +25,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Wrap QuestionDetail in ProtectedRoute as well */}
+          <Route
+            path="/questions/:id"
+            element={
+              <ProtectedRoute>
+                <QuestionDetail />
               </ProtectedRoute>
             }
           />

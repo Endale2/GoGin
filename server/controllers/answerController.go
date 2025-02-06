@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // GetAnswers retrieves all answers for a specific question
@@ -22,14 +23,49 @@ func GetAnswers(c *gin.Context) {
 	}
 
 	collection := config.DB.Collection("answers")
-	cursor, err := collection.Find(context.Background(), bson.M{"question_id": objID})
+
+	// MongoDB aggregation pipeline
+	pipeline := mongo.Pipeline{
+		{
+			{"$match", bson.D{{"question_id", objID}}},
+		},
+		{
+			{"$lookup", bson.D{
+				{"from", "users"},
+				{"localField", "user_id"},
+				{"foreignField", "_id"},
+				{"as", "user"},
+			}},
+		},
+		{
+			{"$unwind", bson.D{
+				{"path", "$user"},
+				{"preserveNullAndEmptyArrays", true}, // In case user data is missing
+			}},
+		},
+		{
+			{"$project", bson.D{
+				{"id", "$_id"},
+				{"question_id", 1},
+				{"content", 1},
+				{"created_at", 1},
+				{"user", bson.D{
+					{"id", "$user._id"},
+					{"name", "$user.name"},
+					{"email", "$user.email"}, // Add any other required fields
+				}},
+			}},
+		},
+	}
+
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch answers"})
 		return
 	}
 	defer cursor.Close(context.Background())
 
-	var answers []models.Answer
+	answers := make([]bson.M, 0) // Use bson.M for flexible JSON response
 	if err := cursor.All(context.Background(), &answers); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing answers"})
 		return
