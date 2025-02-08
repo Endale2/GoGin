@@ -27,6 +27,7 @@ func main() {
 	routes.RecipeRoutes(app)
 	routes.QuestionRoutes(app)
 	routes.AnswerRoutes(app)
+	routes.ReplyRoutes(app)
 
 	app.Run(":8080")
 }
