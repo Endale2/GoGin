@@ -10,9 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // GetReplies retrieves all replies for a specific answer
+// GetReplies retrieves all replies for a specific answer, including user details
 func GetReplies(c *gin.Context) {
 	answerID := c.Param("answer_id")
 	objID, err := primitive.ObjectIDFromHex(answerID)
@@ -22,14 +24,45 @@ func GetReplies(c *gin.Context) {
 	}
 
 	collection := config.DB.Collection("replies")
-	cursor, err := collection.Find(context.Background(), bson.M{"answer_id": objID})
+
+	// Aggregation pipeline to join users collection
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"answer_id": objID}}},
+		{
+			{Key: "$lookup", Value: bson.M{
+				"from":         "users",
+				"localField":   "user_id",
+				"foreignField": "_id",
+				"as":           "user",
+			}},
+		},
+		{
+			{Key: "$unwind", Value: bson.M{"path": "$user", "preserveNullAndEmptyArrays": true}},
+		},
+		{
+			{Key: "$project", Value: bson.M{
+				"id":         "$_id",
+				"answer_id":  1,
+				"content":    1,
+				"user_id":    1,
+				"created_at": 1,
+				"user": bson.M{
+					"id":    "$user._id",
+					"name":  "$user.name",
+					"email": "$user.email",
+				},
+			}},
+		},
+	}
+
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch replies"})
 		return
 	}
 	defer cursor.Close(context.Background())
 
-	var replies []models.Reply
+	var replies []bson.M
 	if err := cursor.All(context.Background(), &replies); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing replies"})
 		return
@@ -72,7 +105,7 @@ func CreateReply(c *gin.Context) {
 	c.JSON(http.StatusCreated, reply)
 }
 
-// GetReplyByID retrieves a reply by ID
+// GetReplyByID retrieves a reply by ID along with the user who created it
 func GetReplyByID(c *gin.Context) {
 	id := c.Param("id")
 	objID, err := primitive.ObjectIDFromHex(id)
@@ -81,15 +114,54 @@ func GetReplyByID(c *gin.Context) {
 		return
 	}
 
-	var reply models.Reply
 	collection := config.DB.Collection("replies")
-	err = collection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&reply)
+
+	// Aggregation pipeline to fetch reply along with user details
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"_id": objID}}},
+		{
+			{Key: "$lookup", Value: bson.M{
+				"from":         "users",
+				"localField":   "user_id",
+				"foreignField": "_id",
+				"as":           "user",
+			}},
+		},
+		{{Key: "$unwind", Value: "$user"}}, // Ensure user data is returned as an object, not an array
+		{
+			{Key: "$project", Value: bson.M{
+				"id":         "$_id",
+				"answer_id":  1,
+				"content":    1,
+				"created_at": 1,
+				"user": bson.M{
+					"name":  "$user.name",
+					"email": "$user.email",
+				},
+			}},
+		},
+	}
+
+	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching reply"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	var results []bson.M
+	if err = cursor.All(context.Background(), &results); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing reply"})
+		return
+	}
+
+	if len(results) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reply not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, reply)
+	// Return the first result (since we are searching by _id, there should only be one)
+	c.JSON(http.StatusOK, results[0])
 }
 
 // UpdateReply updates a reply by ID

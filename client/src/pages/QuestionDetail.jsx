@@ -155,7 +155,7 @@ const QuestionDetail = () => {
           />
           <div>
             <h2 className="text-2xl font-semibold">{question.content}</h2>
-            <p className="text-sm text-gray-500 mt-1">By {question.user?.name || "Unknown User"}</p>
+            <p className="text-sm text-gray-500 mt-1"> {question.user?.name || "Unknown User"}</p>
           </div>
         </div>
       )}
@@ -196,7 +196,7 @@ const QuestionDetail = () => {
                 />
                 <div>
                   <p className="text-lg">{answer.content}</p>
-                  <p className="text-sm text-gray-500 mt-1">By {answer.user?.name || "Unknown User"}</p>
+                  <p className="text-sm text-gray-500 mt-1"> {answer.user?.name || "Unknown User"}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end text-gray-600">
@@ -254,7 +254,7 @@ const QuestionDetail = () => {
                       <div>
                         <p className="text-base">{reply.content}</p>
                         <p className="text-sm text-gray-500 mt-1">
-                          By {reply.user?.name || "Unknown User"}
+                           {reply.user?.name || "Unknown User"}
                         </p>
                       </div>
                     </div>
