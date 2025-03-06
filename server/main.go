@@ -17,7 +17,11 @@ func main() {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
+   
 
+	// Serve static files from the uploads directory
+	app.Static("/uploads", "./uploads")
+	
 	// Database connection
 	config.ConnectDB()
 

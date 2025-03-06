@@ -19,6 +19,7 @@ type SafeUser struct {
 	Name     string             `json:"name"`
 	Email    string             `json:"email"`
 	JoinedAt time.Time          `json:"joined_at"`
+	ProfileImage string         `json:"profile_image"`
 }
 
 type QuestionWithUser struct {
@@ -60,10 +61,11 @@ func GetQuestions(c *gin.Context) {
 		questionsWithUserData = append(questionsWithUserData, QuestionWithUser{
 			Question: question,
 			User: SafeUser{
-				ID:       user.ID,
-				Name:     user.Name,
-				Email:    user.Email,
-				JoinedAt: user.JoinedAt,
+				ID:           user.ID,
+				Name:         user.Name,
+				Email:        user.Email,
+				JoinedAt:     user.JoinedAt,
+				ProfileImage: user.ProfileImage,
 			},
 		})
 	}

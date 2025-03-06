@@ -1,31 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { FiLoader } from "react-icons/fi";
-import { AiOutlineComment, AiOutlineHeart, AiOutlinePlus } from "react-icons/ai";
+import { AiOutlinePlus } from "react-icons/ai";
 import axiosInstance from "../utils/axios";
-
-// Helper function to generate a user avatar URL using a placeholder service
-const getAvatarUrl = (userId) => {
-  return userId ? `https://i.pravatar.cc/50?u=${userId}` : "https://i.pravatar.cc/50?u=default";
-};
-
+import QuestionCard from "../components/QuestionCard"; 
 const HomePage = () => {
   const [data, setData] = useState({ questions: [], courses: [] });
   const [form, setForm] = useState({ content: "", courseId: "" });
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const navigate = useNavigate();
-
+  // Fetch questions and courses on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch questions and courses concurrently
         const [questionsRes, coursesRes] = await Promise.all([
           axiosInstance.get("/questions/"),
           axiosInstance.get("/courses/"),
         ]);
-        setData({ questions: questionsRes.data, courses: coursesRes.data });
+        setData({
+          questions: questionsRes.data,
+          courses: coursesRes.data,
+        });
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -36,12 +31,12 @@ const HomePage = () => {
     fetchData();
   }, []);
 
+  // Create a new question
   const handleCreateQuestion = async (e) => {
     e.preventDefault();
     if (!form.content.trim() || !form.courseId) return;
     try {
       const { data: newQuestion } = await axiosInstance.post("/questions/", form);
-      // Prepend the newly created question to the list
       setData((prev) => ({ ...prev, questions: [newQuestion, ...prev.questions] }));
       setForm({ content: "", courseId: "" });
       setIsModalOpen(false);
@@ -51,7 +46,9 @@ const HomePage = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-200 flex flex-col relative">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-200 relative">
+      <h1 className="text-3xl font-bold mb-6 text-center">Home</h1>
+
       {/* Questions List */}
       {loading ? (
         <div className="text-center py-6 text-gray-500">
@@ -60,47 +57,17 @@ const HomePage = () => {
       ) : data.questions.length > 0 ? (
         <div className="space-y-6">
           {data.questions.map((question) => (
-            <div
-              key={question.id}
-              className="w-full max-w-lg mx-auto p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
-            >
-              <Link to={`/questions/${question.id}`} className="block">
-                <div className="flex items-start space-x-4">
-                  <img
-                    src={getAvatarUrl(question.user?.id || question.user_id)}
-                    alt="Avatar"
-                    className="w-12 h-12 rounded-full"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold">{question.user?.name || "Anonymous"}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {question.user?.email}
-                    </p>
-                    <p className="mt-2 text-gray-800 dark:text-gray-300">{question.content}</p>
-                  </div>
-                </div>
-              </Link>
-              <div className="flex justify-between items-center mt-4 border-t pt-4">
-                <div className="flex space-x-4 text-gray-600 dark:text-gray-300 text-sm">
-                  <span className="flex items-center">
-                    <AiOutlineComment className="mr-1" /> {question.answer_count ?? 0} Comments
-                  </span>
-                  <span className="flex items-center">
-                    <AiOutlineHeart className="mr-1" /> {question.likes ?? 0} Likes
-                  </span>
-                </div>
-              </div>
-            </div>
+            <QuestionCard key={question.id} question={question} />
           ))}
         </div>
       ) : (
         <p className="text-center text-gray-500 dark:text-gray-400 py-6">No questions yet.</p>
       )}
 
-      {/* Floating Action Button (FAB) to open the question modal */}
+      {/* Floating Action Button to open modal */}
       <button
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition-all transform hover:scale-105 focus:outline-none"
+        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 focus:outline-none"
       >
         <AiOutlinePlus size={24} />
       </button>
@@ -116,7 +83,7 @@ const HomePage = () => {
               Ask a Question
             </h2>
             <form onSubmit={handleCreateQuestion} className="space-y-3">
-              {/* Question Input */}
+              {/* Question Textarea */}
               <textarea
                 placeholder="Type your question..."
                 value={form.content}
@@ -125,8 +92,7 @@ const HomePage = () => {
                 rows="3"
                 required
               />
-
-              {/* Course Selection */}
+              {/* Course Selector */}
               <select
                 value={form.courseId}
                 onChange={(e) => setForm({ ...form, courseId: e.target.value })}
@@ -137,12 +103,15 @@ const HomePage = () => {
                   Select a course
                 </option>
                 {data.courses.map((course) => (
-                  <option key={course.id} value={course.id} className="text-gray-900 dark:text-gray-200">
+                  <option
+                    key={course.id}
+                    value={course.id}
+                    className="text-gray-900 dark:text-gray-200"
+                  >
                     {course.title}
                   </option>
                 ))}
               </select>
-
               {/* Modal Actions */}
               <div className="flex justify-end space-x-2">
                 <button

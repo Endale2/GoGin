@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import QuestionDetail from './pages/QuestionDetail';
 import Layout from './components/Layout';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -28,6 +29,16 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          
+
           {/* Wrap QuestionDetail in ProtectedRoute as well */}
           <Route
             path="/questions/:id"

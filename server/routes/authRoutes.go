@@ -15,5 +15,6 @@ func AuthRoutes(router *gin.Engine) {
 		auth.POST("/logout", middleware.AuthMiddleware(), controllers.Logout)
 		auth.GET("/me", middleware.AuthMiddleware(), controllers.GetCurrentUser)
 		auth.POST("/refresh-token", controllers.RefreshToken)
+		auth.POST("/edit-profile", middleware.AuthMiddleware(), controllers.EditProfile)
 	}
 }

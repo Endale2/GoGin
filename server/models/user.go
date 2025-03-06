@@ -15,4 +15,5 @@ type User struct {
 	DepartmentID *primitive.ObjectID  `bson:"department_id,omitempty" json:"department_id,omitempty"` // optional foreign key to department
 	AddedCourses []primitive.ObjectID `bson:"added_courses" json:"added_courses"`                     // references to courses
 	JoinedAt     time.Time            `bson:"joined_at" json:"joined_at"`
+	ProfileImage string               `bson:"profile_image,omitempty" json:"profile_image,omitempty"`
 }

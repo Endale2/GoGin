@@ -1,12 +1,15 @@
 package controllers
 
 import (
+	"fmt"
 	"context"
 	"errors"
 	"go-gin/config"
 	"go-gin/models"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -181,3 +184,79 @@ func GetCurrentUser(c *gin.Context) {
 	user.Password = ""
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
+
+
+
+func EditProfile(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var user models.User
+	collection := config.DB.Collection("users")
+	objID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	if err := collection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&user); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Parse form data
+	name := c.PostForm("name")
+	email := c.PostForm("email")
+	phoneNumber := c.PostForm("phone_number")
+
+	updateFields := bson.M{}
+	if name != "" {
+		updateFields["name"] = name
+	}
+	if email != "" {
+		updateFields["email"] = email
+	}
+	if phoneNumber != "" {
+		updateFields["phone_number"] = phoneNumber
+	}
+
+	// Handle image upload
+	file, err := c.FormFile("image")
+	if err == nil {
+		filePath, err := saveImage(c,file)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Image upload failed"})
+			return
+		}
+		updateFields["profile_image"] = filePath
+	}
+
+	update := bson.M{"$set": updateFields}
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
+}
+
+func saveImage(c *gin.Context, file *multipart.FileHeader) (string, error) {
+	dir := "uploads"
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return "", err
+	}
+
+	fileName := fmt.Sprintf("%d%s", time.Now().UnixNano(), filepath.Ext(file.Filename))
+	filePath := filepath.Join(dir, fileName)
+
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		return "", err
+	}
+
+	return filePath, nil
+}
+
