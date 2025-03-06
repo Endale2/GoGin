@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage';
 import QuestionDetail from './pages/QuestionDetail';
 import Layout from './components/Layout';
 import ProfilePage from './pages/ProfilePage';
+import UserProfilePage from './pages/UserProfilePage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegistrationPage />} />
+        <Route path="/profile/:userId" element={<UserProfilePage />} />
 
         {/* Layout for Protected Routes */}
         <Route path="/" element={<Layout />}>
@@ -30,7 +32,7 @@ function App() {
             }
           />
           <Route
-            path="/profile"
+            path="/profile/me"
             element={
               <ProtectedRoute>
                 <ProfilePage />
