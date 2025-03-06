@@ -6,7 +6,6 @@ import { FaUserCircle } from "react-icons/fa";
 const QuestionCard = ({ question }) => {
   const navigate = useNavigate();
 
-  // Clicking on the user info area redirects to the user's profile page
   const handleProfileClick = (e) => {
     e.stopPropagation();
     if (question.user && question.user.id) {
@@ -14,7 +13,6 @@ const QuestionCard = ({ question }) => {
     }
   };
 
-  // Clicking on the card body (outside the user info) goes to the question detail page
   const handleCardClick = () => {
     navigate(`/questions/${question.id}`);
   };
@@ -22,7 +20,7 @@ const QuestionCard = ({ question }) => {
   return (
     <div
       onClick={handleCardClick}
-      className="cursor-pointer bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 transition transform hover:scale-105 hover:shadow-lg"
+      className="cursor-pointer bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-3 transition transform hover:scale-105 hover:shadow-lg max-w-[600px] w-full mx-auto"
     >
       {/* User Info */}
       <div className="flex items-center mb-3" onClick={handleProfileClick}>
