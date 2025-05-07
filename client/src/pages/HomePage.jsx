@@ -9,6 +9,7 @@ const HomePage = () => {
   const [form, setForm] = useState({ content: "", courseId: "" });
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('question'); // New state to track active tab
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,27 +66,56 @@ const HomePage = () => {
         Logout
       </button>
 
-      {loading ? (
-        <div className="text-center py-6 text-gray-500">
-          <FiLoader size={24} className="animate-spin mx-auto mb-2" /> Loading...
-        </div>
-      ) : data.questions.length > 0 ? (
-        <div className="space-y-6">
-          {data.questions.map((question) => (
-            <QuestionCard key={question.id} question={question} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-center text-gray-500 dark:text-gray-400 py-6">No questions yet.</p>
+      {/* Tab Navigation */}
+      <div className="mb-4 flex justify-center space-x-4">
+        <button
+          className={`px-4 py-2 rounded-md ${activeTab === 'question' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          onClick={() => setActiveTab('question')}
+        >
+          First Question
+        </button>
+        <button
+          className={`px-4 py-2 rounded-md ${activeTab === 'vent' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          onClick={() => setActiveTab('vent')}
+        >
+          Vent
+        </button>
+      </div>
+
+      {/* Content based on active tab */}
+      <div>
+        {activeTab === 'question' ? (
+          <>
+            {loading ? (
+              <div className="text-center py-6 text-gray-500">
+                <FiLoader size={24} className="animate-spin mx-auto mb-2" /> Loading...
+              </div>
+            ) : data.questions.length > 0 ? (
+              <div className="space-y-6">
+                {data.questions.map((question) => (
+                  <QuestionCard key={question.id} question={question} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 dark:text-gray-400 py-6">No questions yet.</p>
+            )}
+          </>
+        ) : (
+          <p className="text-center text-gray-500 dark:text-gray-400 py-6">Vent section is coming soon!</p>
+        )}
+      </div>
+
+      {/* Floating Action Button for creating question */}
+      {activeTab === 'question' && (
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 focus:outline-none"
+        >
+          <AiOutlinePlus size={24} />
+        </button>
       )}
 
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 focus:outline-none"
-      >
-        <AiOutlinePlus size={24} />
-      </button>
-
+      {/* Modal for creating question */}
       {isModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
