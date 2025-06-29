@@ -95,21 +95,12 @@ func CreateReply(c *gin.Context) {
 		return
 	}
 
-	// Get answer ID from route parameter
-	answerID := c.Param("id") // This will be the answer ID from /answers/:id/replies
-	answerObjID, err := primitive.ObjectIDFromHex(answerID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid answer ID"})
-		return
-	}
-
 	if err := c.ShouldBindJSON(&reply); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
 	reply.UserID = objectID
-	reply.AnswerID = answerObjID
 	reply.CreatedAt = time.Now()
 
 	collection := config.DB.Collection("replies")
@@ -130,6 +121,11 @@ func CreateReply(c *gin.Context) {
 			"name":  "", // Will be populated by the frontend or another query
 			"email": "",
 		},
+	}
+
+	// Add parent_reply_id if it exists
+	if reply.ParentReplyID != nil {
+		replyWithUser["parent_reply_id"] = reply.ParentReplyID
 	}
 
 	c.JSON(http.StatusCreated, replyWithUser)
@@ -270,4 +266,80 @@ func DeleteReply(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Reply deleted"})
+}
+
+// LikeReply handles liking a reply
+func LikeReply(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	collection := config.DB.Collection("replies")
+	
+	// Add user to likes array if not already present
+	update := bson.M{
+		"$addToSet": bson.M{"likes": objectID},
+		"$pull":     bson.M{"dislikes": objectID}, // Remove from dislikes if present
+	}
+	
+	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to like reply"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Reply liked successfully"})
+}
+
+// DislikeReply handles disliking a reply
+func DislikeReply(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	collection := config.DB.Collection("replies")
+	
+	// Add user to dislikes array if not already present
+	update := bson.M{
+		"$addToSet": bson.M{"dislikes": objectID},
+		"$pull":     bson.M{"likes": objectID}, // Remove from likes if present
+	}
+	
+	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to dislike reply"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Reply disliked successfully"})
 }

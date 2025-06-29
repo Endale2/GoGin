@@ -17,5 +17,9 @@ func QuestionRoutes(r *gin.Engine) {
 		questionRoutes.POST("/", controllers.CreateQuestion)
 		questionRoutes.PUT("/:id", controllers.UpdateQuestion)
 		questionRoutes.DELETE("/:id", controllers.DeleteQuestion)
+		questionRoutes.POST("/:id/like", controllers.LikeQuestion)
+		questionRoutes.POST("/:id/dislike", controllers.DislikeQuestion)
+		questionRoutes.POST("/:id/save", controllers.SaveQuestion)
+		questionRoutes.DELETE("/:id/save", controllers.UnsaveQuestion)
 	}
 }

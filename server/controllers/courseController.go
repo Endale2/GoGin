@@ -122,3 +122,81 @@ func DeleteCourse(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Course deleted"})
 }
+
+// GetUniversities handles fetching all universities
+func GetUniversities(c *gin.Context) {
+	collection := config.DB.Collection("universities")
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch universities"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	var universities []models.University
+	if err := cursor.All(context.Background(), &universities); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing universities"})
+		return
+	}
+
+	c.JSON(http.StatusOK, universities)
+}
+
+// GetUniversityByID retrieves a university by ID
+func GetUniversityByID(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var university models.University
+	collection := config.DB.Collection("universities")
+	err = collection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&university)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "University not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, university)
+}
+
+// GetDepartments handles fetching all departments
+func GetDepartments(c *gin.Context) {
+	collection := config.DB.Collection("departments")
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch departments"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	var departments []models.Department
+	if err := cursor.All(context.Background(), &departments); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing departments"})
+		return
+	}
+
+	c.JSON(http.StatusOK, departments)
+}
+
+// GetDepartmentByID retrieves a department by ID
+func GetDepartmentByID(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var department models.Department
+	collection := config.DB.Collection("departments")
+	err = collection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&department)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Department not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, department)
+}

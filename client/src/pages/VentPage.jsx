@@ -1,0 +1,532 @@
+import React, { useState, useEffect, useRef } from "react";
+import { FiLoader, FiSearch, FiFilter, FiX } from "react-icons/fi";
+import { AiOutlinePlus, AiOutlineLike, AiOutlineDislike, AiOutlineComment } from "react-icons/ai";
+import { BsBookmark } from "react-icons/bs";
+import { FaUserCircle } from "react-icons/fa";
+import axiosInstance from "../utils/axios";
+
+const VentPage = () => {
+  const [data, setData] = useState({ vents: [], courses: [], universities: [], departments: [] });
+  const [form, setForm] = useState({ 
+    content: "", 
+    courseId: "", 
+    title: "",
+    universityId: "",
+    departmentId: "",
+    type: "vent"
+  });
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState({
+    course: "",
+    university: "",
+    department: ""
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Set());
+  const [lastTypingTime, setLastTypingTime] = useState({});
+  const typingTimeoutRef = useRef({});
+
+  useEffect(() => {
+    fetchData();
+    // Set up real-time polling for new vents
+    const interval = setInterval(fetchData, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
+  }, [searchQuery, filters]);
+
+  const fetchData = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (filters.course) params.append("course", filters.course);
+      if (filters.university) params.append("university", filters.university);
+      if (filters.department) params.append("department", filters.department);
+      params.append("type", "vent");
+
+      const [ventsRes, coursesRes, universitiesRes, departmentsRes] = await Promise.all([
+        axiosInstance.get(`/questions/?${params.toString()}`),
+        axiosInstance.get("/courses/"),
+        axiosInstance.get("/universities/"),
+        axiosInstance.get("/departments/")
+      ]);
+
+      setData({
+        vents: ventsRes.data || [],
+        courses: coursesRes.data || [],
+        universities: universitiesRes.data || [],
+        departments: departmentsRes.data || []
+      });
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      // Set empty arrays on error to prevent null reference errors
+      setData({
+        vents: [],
+        courses: [],
+        universities: [],
+        departments: []
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateVent = async (e) => {
+    e.preventDefault();
+    if (!form.content.trim() || !form.courseId) return;
+    
+    try {
+      const ventData = {
+        content: form.content,
+        course_id: form.courseId,
+        type: "vent"
+      };
+
+      if (form.title) ventData.title = form.title;
+      if (form.universityId) ventData.university_id = form.universityId;
+      if (form.departmentId) ventData.department_id = form.departmentId;
+
+      const { data: newVent } = await axiosInstance.post("/questions/", ventData);
+      
+      // Add user info to the new vent (anonymous)
+      const newVentWithUser = {
+        ...newVent,
+        user: {
+          id: newVent.user_id,
+          name: "Anonymous",
+          email: ""
+        }
+      };
+
+      setData((prev) => ({ 
+        ...prev,
+        vents: [newVentWithUser, ...prev.vents] 
+      }));
+      
+      setForm({ 
+        content: "", 
+        courseId: "", 
+        title: "",
+        universityId: "",
+        departmentId: "",
+        type: "vent"
+      });
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create vent:", err);
+    }
+  };
+
+  const handleLike = async (ventId) => {
+    try {
+      await axiosInstance.post(`/questions/${ventId}/like`);
+      setData(prev => ({
+        ...prev,
+        vents: prev.vents.map(v => 
+          v.id === ventId ? { ...v, likes: (v.likes || 0) + 1 } : v
+        )
+      }));
+    } catch (err) {
+      console.error("Failed to like vent:", err);
+    }
+  };
+
+  const handleDislike = async (ventId) => {
+    try {
+      await axiosInstance.post(`/questions/${ventId}/dislike`);
+      setData(prev => ({
+        ...prev,
+        vents: prev.vents.map(v => 
+          v.id === ventId ? { ...v, dislikes: (v.dislikes || 0) + 1 } : v
+        )
+      }));
+    } catch (err) {
+      console.error("Failed to dislike vent:", err);
+    }
+  };
+
+  const handleSave = async (ventId) => {
+    try {
+      await axiosInstance.post(`/questions/${ventId}/save`);
+      setData(prev => ({
+        ...prev,
+        vents: prev.vents.map(v => 
+          v.id === ventId ? { ...v, saved: true } : v
+        )
+      }));
+    } catch (err) {
+      console.error("Failed to save vent:", err);
+    }
+  };
+
+  const handleUnsave = async (ventId) => {
+    try {
+      await axiosInstance.delete(`/questions/${ventId}/save`);
+      setData(prev => ({
+        ...prev,
+        vents: prev.vents.map(v => 
+          v.id === ventId ? { ...v, saved: false } : v
+        )
+      }));
+    } catch (err) {
+      console.error("Failed to unsave vent:", err);
+    }
+  };
+
+  const handleTyping = () => {
+    const userId = "current-user"; // In a real app, this would be the actual user ID
+    setTypingUsers(prev => new Set([...prev, userId]));
+    setLastTypingTime(prev => ({ ...prev, [userId]: Date.now() }));
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current[userId]) {
+      clearTimeout(typingTimeoutRef.current[userId]);
+    }
+
+    // Set new timeout to remove typing indicator
+    typingTimeoutRef.current[userId] = setTimeout(() => {
+      setTypingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    }, 3000);
+  };
+
+  const clearFilters = () => {
+    setFilters({ course: "", university: "", department: "" });
+    setSearchQuery("");
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Vent Zone
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Share your thoughts anonymously. This is a safe space to express yourself.
+          </p>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search vents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Filter Toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <FiFilter className="mr-2" />
+              Filters
+            </button>
+
+            {/* Clear Filters */}
+            {(filters.course || filters.university || filters.department || searchQuery) && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+              >
+                <FiX className="mr-2" />
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select
+                value={filters.course}
+                onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All Courses</option>
+                {(data.courses || []).map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filters.university}
+                onChange={(e) => setFilters(prev => ({ ...prev, university: e.target.value }))}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All Universities</option>
+                {(data.universities || []).map((uni) => (
+                  <option key={uni.id} value={uni.id}>
+                    {uni.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filters.department}
+                onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All Departments</option>
+                {(data.departments || []).map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Typing Indicators */}
+        {typingUsers.size > 0 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+            <div className="flex items-center text-red-600 dark:text-red-400">
+              <div className="flex space-x-1 mr-2">
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+              <span className="text-sm">
+                {typingUsers.size} user{typingUsers.size > 1 ? 's' : ''} typing...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">
+            <FiLoader className="animate-spin mx-auto mb-2" size={28} />
+            Loading vents...
+          </div>
+        ) : (data.vents && data.vents.length) ? (
+          <div className="space-y-6">
+            {data.vents.map((v) => (
+              <div key={v.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-red-500">
+                {/* User Info - Always Anonymous */}
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-red-600 dark:text-red-400 font-semibold">A</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800 dark:text-gray-200">
+                      Anonymous
+                    </p>
+                    {v.created_at && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(v.created_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vent Content */}
+                <div className="mb-4">
+                  {v.title && (
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                      {v.title}
+                    </h3>
+                  )}
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {v.content}
+                  </p>
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {v.course && (
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      {v.course.title}
+                    </span>
+                  )}
+                  {v.university && (
+                    <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                      {v.university.name}
+                    </span>
+                  )}
+                  {v.department && (
+                    <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                      {v.department.name}
+                    </span>
+                  )}
+                  <span className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                    Vent
+                  </span>
+                </div>
+
+                {/* Vent Stats */}
+                <div className="flex items-center justify-between text-gray-600 dark:text-gray-400 text-sm">
+                  <div className="flex space-x-6">
+                    <span className="flex items-center">
+                      <AiOutlineComment className="mr-1" /> {v.answer_count ?? 0}
+                    </span>
+                    <button
+                      onClick={() => handleLike(v.id)}
+                      className="flex items-center hover:text-blue-600 transition-colors"
+                    >
+                      <AiOutlineLike className="mr-1" /> {v.likes || 0}
+                    </button>
+                    <button
+                      onClick={() => handleDislike(v.id)}
+                      className="flex items-center hover:text-red-600 transition-colors"
+                    >
+                      <AiOutlineDislike className="mr-1" /> {v.dislikes || 0}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => v.saved ? handleUnsave(v.id) : handleSave(v.id)}
+                    className={`flex items-center transition-colors ${
+                      v.saved ? "text-yellow-600" : "hover:text-yellow-600"
+                    }`}
+                  >
+                    <BsBookmark className="mr-1" />
+                    {v.saved ? "Saved" : "Save"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-sm">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-red-600 dark:text-red-400 text-2xl">💭</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                No vents yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                Be the first to share your thoughts in the vent zone!
+              </p>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Start Venting
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Action Button */}
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="fixed bottom-8 right-8 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-xl transition-transform hover:scale-110 focus:outline-none"
+          aria-label="New Vent"
+        >
+          <AiOutlinePlus size={24} />
+        </button>
+
+        {/* Vent Modal */}
+        {isModalOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+            onClick={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
+          >
+            <div className="bg-white dark:bg-gray-800 w-full sm:w-96 p-6 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Share Your Vent
+              </h2>
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  💡 This will be posted anonymously. Feel free to express yourself!
+                </p>
+              </div>
+              <form onSubmit={handleCreateVent} className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Title (optional)"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                />
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="What's on your mind? Share your thoughts..."
+                  value={form.content}
+                  onChange={(e) => {
+                    setForm({ ...form, content: e.target.value });
+                    handleTyping();
+                  }}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                />
+                <select
+                  required
+                  value={form.courseId}
+                  onChange={(e) => setForm({ ...form, courseId: e.target.value })}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                >
+                  <option value="">Select a course</option>
+                  {(data.courses || []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={form.universityId}
+                  onChange={(e) => setForm({ ...form, universityId: e.target.value })}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                >
+                  <option value="">Select university (optional)</option>
+                  {(data.universities || []).map((uni) => (
+                    <option key={uni.id} value={uni.id}>
+                      {uni.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={form.departmentId}
+                  onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-900 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                >
+                  <option value="">Select department (optional)</option>
+                  {(data.departments || []).map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-900 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  >
+                    Vent
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default VentPage; 
