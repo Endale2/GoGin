@@ -13,6 +13,7 @@ func QuestionRoutes(r *gin.Engine) {
 	{
 		questionRoutes.GET("/", controllers.GetQuestions)
 		questionRoutes.GET("/:id", controllers.GetQuestionByID)
+		questionRoutes.GET("/:id/answers", controllers.GetAnswers)
 		questionRoutes.POST("/", controllers.CreateQuestion)
 		questionRoutes.PUT("/:id", controllers.UpdateQuestion)
 		questionRoutes.DELETE("/:id", controllers.DeleteQuestion)

@@ -16,5 +16,9 @@ func AnswerRoutes(r *gin.Engine) {
 		answerRoutes.POST("/", controllers.CreateAnswer)
 		answerRoutes.PUT("/:id", controllers.UpdateAnswer)
 		answerRoutes.DELETE("/:id", controllers.DeleteAnswer)
+		answerRoutes.POST("/:id/like", controllers.LikeAnswer)
+		answerRoutes.POST("/:id/dislike", controllers.DislikeAnswer)
+		answerRoutes.GET("/:id/replies", controllers.GetReplies)
+		answerRoutes.POST("/:id/replies", controllers.CreateReply)
 	}
 }

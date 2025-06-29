@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"go-gin/config"
 	"go-gin/models"
+	"go-gin/utils"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -34,11 +36,26 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Validate institutional email
+	if !utils.IsInstitutionalEmail(user.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only institutional emails ending with .edu.et are allowed"})
+		return
+	}
+
+	// Validate password strength
+	if isValid, message := utils.ValidatePasswordStrength(user.Password); !isValid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": message})
+		return
+	}
+
+	// Normalize email to lowercase
+	user.Email = strings.ToLower(user.Email)
+
 	collection := config.DB.Collection("users")
 	var existingUser models.User
 	err := collection.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&existingUser)
 	if err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User already registered"})
+		c.JSON(http.StatusConflict, gin.H{"error": "User already registered with this email"})
 		return
 	}
 
@@ -50,6 +67,8 @@ func Register(c *gin.Context) {
 	user.Password = string(hashedPassword)
 	user.ID = primitive.NewObjectID()
 	user.JoinedAt = time.Now()
+	user.LastActive = time.Now()
+	user.IsVerified = false // Will be verified through email verification
 
 	_, err = collection.InsertOne(context.Background(), user)
 	if err != nil {
@@ -57,7 +76,10 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully!"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User registered successfully! Please check your institutional email for verification.",
+		"institution": utils.GetInstitutionFromEmail(user.Email),
+	})
 }
 
 func Login(c *gin.Context) {
@@ -69,12 +91,26 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Normalize email to lowercase
+	user.Email = strings.ToLower(user.Email)
+
+	// Validate institutional email format
+	if !utils.IsInstitutionalEmail(user.Email) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please use your institutional email address"})
+		return
+	}
+
 	collection := config.DB.Collection("users")
 	err := collection.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&foundUser)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(user.Password)) != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid institutional email or password"})
 		return
 	}
+
+	// Update last active time
+	collection.UpdateOne(context.Background(), 
+		bson.M{"_id": foundUser.ID}, 
+		bson.M{"$set": bson.M{"last_active": time.Now()}})
 
 	accessToken, accessDuration, err := CreateJWT(foundUser.ID.Hex(), 15*time.Minute)
 	if err != nil {
@@ -91,7 +127,15 @@ func Login(c *gin.Context) {
 	c.SetCookie("accessToken", accessToken, int(accessDuration.Seconds()), "/", "localhost", false, true)
 	c.SetCookie("refreshToken", refreshToken, int(refreshDuration.Seconds()), "/", "localhost", false, true)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful!"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login successful!",
+		"user": gin.H{
+			"id": foundUser.ID,
+			"name": foundUser.Name,
+			"email": foundUser.Email,
+			"institution": utils.GetInstitutionFromEmail(foundUser.Email),
+		},
+	})
 }
 
 func CreateJWT(userID string, duration time.Duration) (string, time.Duration, error) {
@@ -186,8 +230,6 @@ func GetCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
-
-
 func EditProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -218,6 +260,21 @@ func EditProfile(c *gin.Context) {
 		updateFields["name"] = name
 	}
 	if email != "" {
+		// Validate institutional email if provided
+		email = strings.ToLower(email)
+		if !utils.IsInstitutionalEmail(email) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Only institutional emails ending with .edu.et are allowed"})
+			return
+		}
+		
+		// Check if email is already taken by another user
+		var existingUser models.User
+		err := collection.FindOne(context.Background(), bson.M{"email": email, "_id": bson.M{"$ne": objID}}).Decode(&existingUser)
+		if err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email is already registered by another user"})
+			return
+		}
+		
 		updateFields["email"] = email
 	}
 	if phoneNumber != "" {
@@ -260,8 +317,6 @@ func saveImage(c *gin.Context, file *multipart.FileHeader) (string, error) {
 
 	return filePath, nil
 }
-
-
 
 func GetUserById(c *gin.Context) {
 	userCollection := config.DB.Collection("users")

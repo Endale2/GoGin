@@ -13,10 +13,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// GetReplies retrieves all replies for a specific answer
 // GetReplies retrieves all replies for a specific answer, including user details
 func GetReplies(c *gin.Context) {
-	answerID := c.Param("answer_id")
+	// Check if we're getting replies by answer ID from the answer route
+	answerID := c.Param("id") // This will be the answer ID from /answers/:id/replies
+	if answerID == "" {
+		// Fallback to the old route parameter
+		answerID = c.Param("answer_id")
+	}
+	
 	objID, err := primitive.ObjectIDFromHex(answerID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid answer ID"})
@@ -46,10 +51,13 @@ func GetReplies(c *gin.Context) {
 				"content":    1,
 				"user_id":    1,
 				"created_at": 1,
+				"likes":      bson.M{"$size": bson.M{"$ifNull": []interface{}{"$likes", []interface{}{}}}},
+				"dislikes":   bson.M{"$size": bson.M{"$ifNull": []interface{}{"$dislikes", []interface{}{}}}},
 				"user": bson.M{
-					"id":    "$user._id",
-					"name":  "$user.name",
-					"email": "$user.email",
+					"id":            "$user._id",
+					"name":          "$user.name",
+					"email":         "$user.email",
+					"profile_image": "$user.profile_image",
 				},
 			}},
 		},
@@ -87,12 +95,21 @@ func CreateReply(c *gin.Context) {
 		return
 	}
 
+	// Get answer ID from route parameter
+	answerID := c.Param("id") // This will be the answer ID from /answers/:id/replies
+	answerObjID, err := primitive.ObjectIDFromHex(answerID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid answer ID"})
+		return
+	}
+
 	if err := c.ShouldBindJSON(&reply); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
 	reply.UserID = objectID
+	reply.AnswerID = answerObjID
 	reply.CreatedAt = time.Now()
 
 	collection := config.DB.Collection("replies")
@@ -102,7 +119,20 @@ func CreateReply(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, reply)
+	// Return the created reply with user information
+	replyWithUser := bson.M{
+		"id":         reply.ID,
+		"answer_id":  reply.AnswerID,
+		"content":    reply.Content,
+		"created_at": reply.CreatedAt,
+		"user": bson.M{
+			"id":    reply.UserID,
+			"name":  "", // Will be populated by the frontend or another query
+			"email": "",
+		},
+	}
+
+	c.JSON(http.StatusCreated, replyWithUser)
 }
 
 // GetReplyByID retrieves a reply by ID along with the user who created it

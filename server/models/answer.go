@@ -13,4 +13,6 @@ type Answer struct {
 	Content    string             `bson:"content" json:"content" validate:"required"`         // Answer content
 	UserID     primitive.ObjectID `bson:"user_id" json:"user_id" validate:"required"`         // Reference to User model (creator)
 	CreatedAt  time.Time          `bson:"created_at" json:"created_at"`
+	Likes      []primitive.ObjectID `bson:"likes,omitempty" json:"likes,omitempty"`             // Array of user IDs who liked this answer
+	Dislikes   []primitive.ObjectID `bson:"dislikes,omitempty" json:"dislikes,omitempty"`       // Array of user IDs who disliked this answer
 }

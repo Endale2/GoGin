@@ -15,7 +15,13 @@ import (
 
 // GetAnswers retrieves all answers for a specific question
 func GetAnswers(c *gin.Context) {
-	questionID := c.Param("question_id")
+	// Check if we're getting answers by question ID from the question route
+	questionID := c.Param("id") // This will be the question ID from /questions/:id/answers
+	if questionID == "" {
+		// Fallback to the old route parameter
+		questionID = c.Param("question_id")
+	}
+	
 	objID, err := primitive.ObjectIDFromHex(questionID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid question ID"})
@@ -44,15 +50,42 @@ func GetAnswers(c *gin.Context) {
 			}},
 		},
 		{
+			{"$lookup", bson.D{
+				{"from", "replies"},
+				{"localField", "_id"},
+				{"foreignField", "answer_id"},
+				{"as", "replies"},
+			}},
+		},
+		{
 			{"$project", bson.D{
 				{"id", "$_id"},
 				{"question_id", 1},
 				{"content", 1},
 				{"created_at", 1},
+				{"likes", bson.D{{"$size", bson.D{{"$ifNull", []interface{}{"$likes", []interface{}{}}}}}}},
+				{"dislikes", bson.D{{"$size", bson.D{{"$ifNull", []interface{}{"$dislikes", []interface{}{}}}}}}},
 				{"user", bson.D{
 					{"id", "$user._id"},
 					{"name", "$user.name"},
-					{"email", "$user.email"}, // Add any other required fields
+					{"email", "$user.email"},
+					{"profile_image", "$user.profile_image"},
+				}},
+				{"replies", bson.D{
+					{"$map", bson.D{
+						{"input", "$replies"},
+						{"as", "reply"},
+						{"in", bson.D{
+							{"id", "$$reply._id"},
+							{"content", "$$reply.content"},
+							{"created_at", "$$reply.created_at"},
+							{"user", bson.D{
+								{"id", "$$reply.user_id"},
+								{"name", "$$reply.user_name"},
+								{"email", "$$reply.user_email"},
+							}},
+						}},
+					}},
 				}},
 			}},
 		},
@@ -214,4 +247,80 @@ func DeleteAnswer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Answer deleted"})
+}
+
+// LikeAnswer handles liking an answer
+func LikeAnswer(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	collection := config.DB.Collection("answers")
+	
+	// Add user to likes array if not already present
+	update := bson.M{
+		"$addToSet": bson.M{"likes": objectID},
+		"$pull":     bson.M{"dislikes": objectID}, // Remove from dislikes if present
+	}
+	
+	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to like answer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Answer liked successfully"})
+}
+
+// DislikeAnswer handles disliking an answer
+func DislikeAnswer(c *gin.Context) {
+	id := c.Param("id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	collection := config.DB.Collection("answers")
+	
+	// Add user to dislikes array if not already present
+	update := bson.M{
+		"$addToSet": bson.M{"dislikes": objectID},
+		"$pull":     bson.M{"likes": objectID}, // Remove from likes if present
+	}
+	
+	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to dislike answer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Answer disliked successfully"})
 }

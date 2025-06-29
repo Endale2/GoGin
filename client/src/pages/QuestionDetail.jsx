@@ -1,287 +1,421 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FiLoader, FiArrowLeft } from "react-icons/fi";
+import { AiOutlineComment, AiOutlineHeart, AiOutlineLike, AiOutlineDislike } from "react-icons/ai";
+import { FaUserCircle, FaReply } from "react-icons/fa";
 import axiosInstance from "../utils/axios";
-import { AiOutlineComment, AiOutlineHeart } from "react-icons/ai";
-import { FaArrowLeft } from "react-icons/fa";
-
-// Helper to generate an avatar URL (using a placeholder service)
-const getAvatarUrl = (userId) => {
-  return userId ? `https://i.pravatar.cc/50?u=${userId}` : "https://i.pravatar.cc/50?u=default";
-};
 
 const QuestionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
-  // State variables
   const [question, setQuestion] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [replyContent, setReplyContent] = useState("");
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [expandedReplies, setExpandedReplies] = useState({}); // tracks expanded state per answer id
-  const [answerContent, setAnswerContent] = useState("");
+  const [newAnswer, setNewAnswer] = useState("");
+  const [newReply, setNewReply] = useState({});
+  const [replyingTo, setReplyingTo] = useState(null);
 
-  // Fetch question and answers with enriched replies and user data
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch question and its answers concurrently
-        const [questionRes, answersRes] = await Promise.all([
-          axiosInstance.get(`/questions/${id}`),
-          axiosInstance.get(`/answers/question/${id}`)
-        ]);
-
-        // Enrich each answer with its replies and fetch user data for each reply
-        const enrichedAnswers = await Promise.all(
-          answersRes.data.map(async (answer) => {
-            // Fetch replies for this answer (using answer.id as projected by your aggregation)
-            const replyRes = await axiosInstance.get(`/replies/answer/${answer.id}`);
-            const repliesData = replyRes.data || [];
-
-            // Enrich each reply with user data if not already present
-            const enrichedReplies = await Promise.all(
-              repliesData.map(async (reply) => {
-                if (!reply.user && reply.user_id) {
-                  try {
-                    const userRes = await axiosInstance.get(`/users/${reply.user_id}`);
-                    reply.user = userRes.data;
-                  } catch (err) {
-                    console.error("Error fetching user for reply", reply.user_id, err);
-                    reply.user = { id: reply.user_id, name: "Unknown User" };
-                  }
-                }
-                return reply;
-              })
-            );
-            return { ...answer, replies: enrichedReplies };
-          })
-        );
-
-        setQuestion(questionRes.data);
-        setAnswers(enrichedAnswers);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load data. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchQuestionAndAnswers();
   }, [id]);
 
-  // Handle posting a new answer
-  const handleAnswerSubmit = async (e) => {
-    e.preventDefault();
-    if (!answerContent.trim()) return;
+  const fetchQuestionAndAnswers = async () => {
     try {
-      const { data: newAnswer } = await axiosInstance.post("/answers/", {
-        content: answerContent,
+      const [questionRes, answersRes] = await Promise.all([
+        axiosInstance.get(`/questions/${id}`),
+        axiosInstance.get(`/questions/${id}/answers`)
+      ]);
+      setQuestion(questionRes.data);
+      setAnswers(answersRes.data || []);
+    } catch (err) {
+      console.error("Error fetching question details:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitAnswer = async (e) => {
+    e.preventDefault();
+    if (!newAnswer.trim()) return;
+
+    try {
+      const response = await axiosInstance.post(`/questions/${id}/answers`, {
+        content: newAnswer,
         question_id: id
       });
-      // Enrich newAnswer with user data if not present
-      if (!newAnswer.user && newAnswer.user_id) {
-        try {
-          const userRes = await axiosInstance.get(`/users/${newAnswer.user_id}`);
-          newAnswer.user = userRes.data;
-        } catch (err) {
-          console.error("Error fetching user for new answer", newAnswer.user_id, err);
-          newAnswer.user = { id: newAnswer.user_id, name: "Unknown User" };
+      
+      // Add the new answer to the beginning of the list
+      const newAnswerWithUser = {
+        ...response.data,
+        user: {
+          id: response.data.user_id,
+          name: "You", // This will be updated when we refetch
+          email: ""
         }
-      }
-      // Prepend the new answer
-      setAnswers([newAnswer, ...answers]);
-      setAnswerContent("");
+      };
+      
+      setAnswers(prev => [newAnswerWithUser, ...prev]);
+      setNewAnswer("");
     } catch (err) {
-      console.error("Failed to post answer:", err);
-      setError("Could not post answer. Try again.");
+      console.error("Failed to submit answer:", err);
     }
   };
 
-  // Handle posting a new reply for a given answer
-  const handleReplySubmit = async (e, answerId) => {
+  const handleSubmitReply = async (answerId, e) => {
     e.preventDefault();
-    if (!replyContent.trim()) return;
+    const replyContent = newReply[answerId];
+    if (!replyContent?.trim()) return;
+
     try {
-      const { data: newReply } = await axiosInstance.post("/replies/", {
-        content: replyContent,
-        answer_id: answerId
+      const response = await axiosInstance.post(`/answers/${answerId}/replies`, {
+        content: replyContent
       });
-      // Enrich new reply with user data if not present
-      if (!newReply.user && newReply.user_id) {
-        try {
-          const userRes = await axiosInstance.get(`/users/${newReply.user_id}`);
-          newReply.user = userRes.data;
-        } catch (err) {
-          console.error("Error fetching user for new reply", newReply.user_id, err);
-          newReply.user = { id: newReply.user_id, name: "Unknown User" };
+      
+      // Update the answers state to include the new reply
+      setAnswers(prev => prev.map(answer => {
+        if (answer.id === answerId) {
+          return {
+            ...answer,
+            replies: [...(answer.replies || []), response.data]
+          };
         }
-      }
-      // Update the corresponding answer's replies in state
-      setAnswers((prevAnswers) =>
-        prevAnswers.map((answer) =>
-          answer.id === answerId
-            ? { ...answer, replies: [...(answer.replies || []), newReply] }
-            : answer
-        )
-      );
-      setReplyContent("");
-      setSelectedAnswer(null);
+        return answer;
+      }));
+      
+      setNewReply(prev => ({ ...prev, [answerId]: "" }));
+      setReplyingTo(null);
     } catch (err) {
-      console.error("Failed to post reply:", err);
-      setError("Could not post reply. Try again.");
+      console.error("Failed to submit reply:", err);
     }
   };
 
-  if (loading) return <div className="text-center py-6">Loading...</div>;
-  if (error) return <div className="text-center py-6 text-red-500">{error}</div>;
+  const handleLike = async (answerId) => {
+    try {
+      await axiosInstance.post(`/answers/${answerId}/like`);
+      // Update the like count in the UI
+      setAnswers(prev => prev.map(answer => {
+        if (answer.id === answerId) {
+          return { ...answer, likes: (answer.likes || 0) + 1 };
+        }
+        return answer;
+      }));
+    } catch (err) {
+      console.error("Failed to like answer:", err);
+    }
+  };
+
+  const handleDislike = async (answerId) => {
+    try {
+      await axiosInstance.post(`/answers/${answerId}/dislike`);
+      // Update the dislike count in the UI
+      setAnswers(prev => prev.map(answer => {
+        if (answer.id === answerId) {
+          return { ...answer, dislikes: (answer.dislikes || 0) + 1 };
+        }
+        return answer;
+      }));
+    } catch (err) {
+      console.error("Failed to dislike answer:", err);
+    }
+  };
+
+  const ReplyTree = ({ replies, depth = 0 }) => {
+    if (!replies || replies.length === 0) return null;
+
+    return (
+      <div className={`ml-${Math.min(depth * 4, 16)} space-y-3`}>
+        {replies.map((reply) => (
+          <div key={reply.id} className="border-l-2 border-gray-200 pl-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center mb-2">
+                {reply.user?.profile_image ? (
+                  <img
+                    src={`http://localhost:8080/${reply.user.profile_image}`}
+                    alt="User Profile"
+                    className="w-6 h-6 rounded-full object-cover mr-2"
+                  />
+                ) : (
+                  <FaUserCircle className="w-6 h-6 text-gray-400 mr-2" />
+                )}
+                <span className="font-medium text-sm text-gray-700">
+                  {reply.user?.name || "Anonymous"}
+                </span>
+                <span className="text-xs text-gray-500 ml-2">
+                  {new Date(reply.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">{reply.content}</p>
+              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                <button
+                  onClick={() => handleLike(reply.id)}
+                  className="flex items-center hover:text-blue-600"
+                >
+                  <AiOutlineLike className="mr-1" />
+                  {reply.likes || 0}
+                </button>
+                <button
+                  onClick={() => handleDislike(reply.id)}
+                  className="flex items-center hover:text-red-600"
+                >
+                  <AiOutlineDislike className="mr-1" />
+                  {reply.dislikes || 0}
+                </button>
+                <button
+                  onClick={() => setReplyingTo(reply.id)}
+                  className="flex items-center hover:text-green-600"
+                >
+                  <FaReply className="mr-1" />
+                  Reply
+                </button>
+              </div>
+              
+              {replyingTo === reply.id && (
+                <form
+                  onSubmit={(e) => handleSubmitReply(reply.id, e)}
+                  className="mt-3"
+                >
+                  <textarea
+                    value={newReply[reply.id] || ""}
+                    onChange={(e) => setNewReply(prev => ({ ...prev, [reply.id]: e.target.value }))}
+                    placeholder="Write a reply..."
+                    className="w-full p-2 border rounded text-sm"
+                    rows="2"
+                  />
+                  <div className="flex space-x-2 mt-2">
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                    >
+                      Reply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+              
+              {reply.replies && reply.replies.length > 0 && (
+                <ReplyTree replies={reply.replies} depth={depth + 1} />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <FiLoader className="animate-spin mx-auto mb-4" size={32} />
+          <p className="text-gray-600">Loading question...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!question) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Question not found</p>
+          <button
+            onClick={() => navigate("/home")}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-200">
-      {/* Back Button */}
-      <button onClick={() => navigate(-1)} className="mb-4 flex items-center text-blue-600">
-        <FaArrowLeft className="mr-2" /> Back
-      </button>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate("/home")}
+          className="flex items-center text-gray-600 hover:text-gray-800 mb-6"
+        >
+          <FiArrowLeft className="mr-2" />
+          Back to Questions
+        </button>
 
-      {/* Question Section */}
-      {question && (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg flex items-start">
-          <img 
-            src={getAvatarUrl(question.user?.id || question.user_id)} 
-            alt="avatar" 
-            className="w-12 h-12 rounded-full mr-4" 
-          />
-          <div>
-            <h2 className="text-2xl font-semibold">{question.content}</h2>
-            <p className="text-sm text-gray-500 mt-1"> {question.user?.name || "Unknown User"}</p>
+        {/* Question */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center mb-4">
+            {question.user?.profile_image ? (
+              <img
+                src={`http://localhost:8080/${question.user.profile_image}`}
+                alt="User Profile"
+                className="w-12 h-12 rounded-full object-cover mr-3"
+              />
+            ) : (
+              <FaUserCircle className="w-12 h-12 text-gray-400 mr-3" />
+            )}
+            <div>
+              <p className="font-medium text-gray-800">
+                {question.user?.name || "Anonymous"}
+              </p>
+              {question.created_at && (
+                <p className="text-sm text-gray-500">
+                  {new Date(question.created_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h1 className="text-xl font-semibold text-gray-800 mb-3">
+              {question.content}
+            </h1>
+            {question.course && (
+              <span className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+                {question.course.title}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-6 text-gray-600 text-sm">
+            <span className="flex items-center">
+              <AiOutlineComment className="mr-1" />
+              {answers.length} answers
+            </span>
+            <span className="flex items-center">
+              <AiOutlineHeart className="mr-1" />
+              {question.likes || 0} likes
+            </span>
           </div>
         </div>
-      )}
 
-      {/* Answer Count & Answer Form */}
-      <div className="mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">Answers ({answers.length})</h3>
+        {/* Answer Form */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Answer</h2>
+          <form onSubmit={handleSubmitAnswer}>
+            <textarea
+              value={newAnswer}
+              onChange={(e) => setNewAnswer(e.target.value)}
+              placeholder="Write your answer..."
+              className="w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows="4"
+            />
+            <button
+              type="submit"
+              className="mt-3 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Post Answer
+            </button>
+          </form>
         </div>
-        <form onSubmit={handleAnswerSubmit} className="mb-6">
-          <textarea
-            className="w-full p-3 border rounded-md dark:bg-gray-900"
-            rows="4"
-            placeholder="Write your answer..."
-            value={answerContent}
-            onChange={(e) => setAnswerContent(e.target.value)}
-            required
-          ></textarea>
-          <button
-            type="submit"
-            className="mt-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Post Answer
-          </button>
-        </form>
-      </div>
 
-      {/* Answers List */}
-      {answers?.length > 0 ? (
-        answers.map((answer) => (
-          <div key={answer.id} className="bg-white dark:bg-gray-800 p-6 mt-6 rounded-lg shadow">
-            <div className="flex justify-between items-start">
-              <div className="flex items-start">
-                <img 
-                  src={getAvatarUrl(answer.user?.id || answer.user_id)} 
-                  alt="avatar" 
-                  className="w-10 h-10 rounded-full mr-4" 
-                />
+        {/* Answers */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-gray-800">
+            {answers.length} Answer{answers.length !== 1 ? 's' : ''}
+          </h2>
+          
+          {answers.map((answer) => (
+            <div key={answer.id} className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center mb-4">
+                {answer.user?.profile_image ? (
+                  <img
+                    src={`http://localhost:8080/${answer.user.profile_image}`}
+                    alt="User Profile"
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                ) : (
+                  <FaUserCircle className="w-10 h-10 text-gray-400 mr-3" />
+                )}
                 <div>
-                  <p className="text-lg">{answer.content}</p>
-                  <p className="text-sm text-gray-500 mt-1"> {answer.user?.name || "Unknown User"}</p>
+                  <p className="font-medium text-gray-800">
+                    {answer.user?.name || "Anonymous"}
+                  </p>
+                  {answer.created_at && (
+                    <p className="text-sm text-gray-500">
+                      {new Date(answer.created_at).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="flex flex-col items-end text-gray-600">
-                <span className="flex items-center mb-1">
-                  <AiOutlineHeart className="mr-1" /> {answer.likes || 0}
-                </span>
-                <span
-                  className="flex items-center cursor-pointer"
-                  onClick={() =>
-                    setSelectedAnswer(answer.id === selectedAnswer ? null : answer.id)
-                  }
-                >
-                  <AiOutlineComment className="mr-1" /> {answer.replies?.length || 0} Replies
-                </span>
-              </div>
-            </div>
 
-            {/* Reply Form for selected answer */}
-            {selectedAnswer === answer.id && (
-              <form onSubmit={(e) => handleReplySubmit(e, answer.id)} className="mt-4">
-                <textarea
-                  className="w-full p-3 border rounded-md dark:bg-gray-900"
-                  rows="3"
-                  placeholder="Write a reply..."
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  required
-                ></textarea>
+              <div className="mb-4">
+                <p className="text-gray-700 leading-relaxed">{answer.content}</p>
+              </div>
+
+              <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
                 <button
-                  type="submit"
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  onClick={() => handleLike(answer.id)}
+                  className="flex items-center hover:text-blue-600"
                 >
-                  Post Reply
+                  <AiOutlineLike className="mr-1" />
+                  {answer.likes || 0}
                 </button>
-              </form>
-            )}
-
-            {/* Replies List with Dropdown for More Replies */}
-            {answer.replies?.length > 0 && (
-              <div className="mt-6 ml-6 border-l-2 border-gray-300 pl-4">
-                {(expandedReplies[answer.id]
-                  ? answer.replies
-                  : answer.replies.slice(0, 2)
-                ).map((reply) => (
-                  <div
-                    key={reply.id || reply._id}
-                    className="mt-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg"
-                  >
-                    <div className="flex items-start">
-                      <img 
-                        src={getAvatarUrl(reply.user?.id || reply.user_id)} 
-                        alt="avatar" 
-                        className="w-8 h-8 rounded-full mr-3" 
-                      />
-                      <div>
-                        <p className="text-base">{reply.content}</p>
-                        <p className="text-sm text-gray-500 mt-1">
-                           {reply.user?.name || "Unknown User"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {answer.replies.length > 2 && (
-                  <button
-                    onClick={() =>
-                      setExpandedReplies((prev) => ({
-                        ...prev,
-                        [answer.id]: !prev[answer.id]
-                      }))
-                    }
-                    className="mt-2 text-blue-600 text-sm focus:outline-none"
-                  >
-                    {expandedReplies[answer.id]
-                      ? "Show less replies"
-                      : `Show ${answer.replies.length - 2} more replies`}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleDislike(answer.id)}
+                  className="flex items-center hover:text-red-600"
+                >
+                  <AiOutlineDislike className="mr-1" />
+                  {answer.dislikes || 0}
+                </button>
+                <button
+                  onClick={() => setReplyingTo(answer.id)}
+                  className="flex items-center hover:text-green-600"
+                >
+                  <FaReply className="mr-1" />
+                  Reply
+                </button>
               </div>
-            )}
-          </div>
-        ))
-      ) : (
-        <p className="text-gray-500 mt-4">No answers yet.</p>
-      )}
+
+              {/* Reply Form */}
+              {replyingTo === answer.id && (
+                <form
+                  onSubmit={(e) => handleSubmitReply(answer.id, e)}
+                  className="mb-4 p-4 bg-gray-50 rounded-lg"
+                >
+                  <textarea
+                    value={newReply[answer.id] || ""}
+                    onChange={(e) => setNewReply(prev => ({ ...prev, [answer.id]: e.target.value }))}
+                    placeholder="Write a reply..."
+                    className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="3"
+                  />
+                  <div className="flex space-x-2 mt-3">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Reply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Reply Tree */}
+              <ReplyTree replies={answer.replies || []} />
+            </div>
+          ))}
+
+          {answers.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <p>No answers yet. Be the first to answer!</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

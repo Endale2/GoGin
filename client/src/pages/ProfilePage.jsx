@@ -11,6 +11,7 @@ const ProfilePage = () => {
     phone_number: '',
     image: null,
   });
+  const [errors, setErrors] = useState({});
   const [submitLoading, setSubmitLoading] = useState(false);
 
   // Fetch user details on component mount
@@ -37,6 +38,29 @@ const ProfilePage = () => {
     }
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters long';
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!formData.email.toLowerCase().endsWith('.edu.et')) {
+      newErrors.email = 'Please use your institutional email address (.edu.et)';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleEditToggle = () => {
     setIsEditing(true);
   };
@@ -52,6 +76,7 @@ const ProfilePage = () => {
         image: null,
       });
     }
+    setErrors({});
   };
 
   const handleChange = (e) => {
@@ -61,15 +86,28 @@ const ProfilePage = () => {
     } else {
       setFormData({ ...formData, [name]: value });
     }
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setSubmitLoading(true);
 
     const data = new FormData();
-    data.append('name', formData.name);
-    data.append('email', formData.email);
+    data.append('name', formData.name.trim());
+    data.append('email', formData.email.toLowerCase());
     data.append('phone_number', formData.phone_number);
     if (formData.image) {
       data.append('image', formData.image);
@@ -82,20 +120,32 @@ const ProfilePage = () => {
       // Refresh user data after update
       await fetchUser();
       setIsEditing(false);
+      setErrors({});
     } catch (error) {
       console.error('Failed to update profile:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to update profile';
+      setErrors({ general: errorMessage });
     } finally {
       setSubmitLoading(false);
     }
   };
 
+  const getInstitutionFromEmail = (email) => {
+    if (!email || !email.includes('@')) return '';
+    const domain = email.split('@')[1];
+    if (domain.endsWith('.edu.et')) {
+      return domain.replace('.edu.et', '');
+    }
+    return '';
+  };
+
   if (loading) return <p className="text-center mt-8">Loading...</p>;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded-lg mt-8">
+    <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded-lg mt-8">
       {!isEditing ? (
         <div>
-          <h2 className="text-3xl font-bold mb-6 text-center">User Profile</h2>
+          <h2 className="text-3xl font-bold mb-6 text-center">Student Profile</h2>
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <div className="flex-shrink-0">
               <img
@@ -110,40 +160,49 @@ const ProfilePage = () => {
             </div>
             <div className="flex-1 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold">Name</h3>
-                <p>{user.name}</p>
+                <h3 className="text-xl font-semibold">Full Name</h3>
+                <p className="text-gray-700">{user.name}</p>
               </div>
               <div>
-                <h3 className="text-xl font-semibold">Email</h3>
-                <p>{user.email}</p>
+                <h3 className="text-xl font-semibold">Institutional Email</h3>
+                <p className="text-gray-700">{user.email}</p>
+                <p className="text-sm text-blue-600 font-medium">
+                  Institution: {getInstitutionFromEmail(user.email).toUpperCase()}
+                </p>
               </div>
               {user.phone_number && (
                 <div>
                   <h3 className="text-xl font-semibold">Phone Number</h3>
-                  <p>{user.phone_number}</p>
+                  <p className="text-gray-700">{user.phone_number}</p>
                 </div>
               )}
               {user.department_id && (
                 <div>
                   <h3 className="text-xl font-semibold">Department</h3>
-                  <p>{user.department_id}</p>
+                  <p className="text-gray-700">{user.department_id}</p>
+                </div>
+              )}
+              {user.year_of_study && (
+                <div>
+                  <h3 className="text-xl font-semibold">Year of Study</h3>
+                  <p className="text-gray-700">Year {user.year_of_study}</p>
                 </div>
               )}
               {user.joined_at && (
                 <div>
-                  <h3 className="text-xl font-semibold">Joined At</h3>
-                  <p>{new Date(user.joined_at).toLocaleDateString()}</p>
+                  <h3 className="text-xl font-semibold">Member Since</h3>
+                  <p className="text-gray-700">{new Date(user.joined_at).toLocaleDateString()}</p>
                 </div>
               )}
               {user.added_courses && user.added_courses.length > 0 && (
                 <div>
-                  <h3 className="text-xl font-semibold">Added Courses</h3>
-                  <p>{user.added_courses.length}</p>
+                  <h3 className="text-xl font-semibold">Enrolled Courses</h3>
+                  <p className="text-gray-700">{user.added_courses.length} courses</p>
                 </div>
               )}
               <button
                 onClick={handleEditToggle}
-                className="mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+                className="mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
               >
                 Edit Profile
               </button>
@@ -152,11 +211,18 @@ const ProfilePage = () => {
         </div>
       ) : (
         <div>
-          <h2 className="text-3xl font-bold mb-6 text-center">Edit Profile</h2>
+          <h2 className="text-3xl font-bold mb-6 text-center">Edit Student Profile</h2>
+          
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+              {errors.general}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-lg font-medium">
-                Name
+                Full Name
               </label>
               <input
                 type="text"
@@ -164,12 +230,16 @@ const ProfilePage = () => {
                 id="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="mt-1 w-full border rounded px-4 py-2"
+                className={`mt-1 w-full border rounded px-4 py-2 ${
+                  errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter your full name"
               />
+              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
             </div>
             <div>
               <label htmlFor="email" className="block text-lg font-medium">
-                Email
+                Institutional Email
               </label>
               <input
                 type="email"
@@ -177,8 +247,15 @@ const ProfilePage = () => {
                 id="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 w-full border rounded px-4 py-2"
+                className={`mt-1 w-full border rounded px-4 py-2 ${
+                  errors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="yourname@university.edu.et"
               />
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              <p className="text-xs text-gray-500 mt-1">
+                Only institutional emails ending with .edu.et are accepted
+              </p>
             </div>
             <div>
               <label htmlFor="phone_number" className="block text-lg font-medium">
@@ -190,7 +267,8 @@ const ProfilePage = () => {
                 id="phone_number"
                 value={formData.phone_number}
                 onChange={handleChange}
-                className="mt-1 w-full border rounded px-4 py-2"
+                className="mt-1 w-full border rounded px-4 py-2 border-gray-300"
+                placeholder="Enter your phone number"
               />
             </div>
             <div>
@@ -201,23 +279,23 @@ const ProfilePage = () => {
                 type="file"
                 name="image"
                 id="image"
-                accept="image/*"
                 onChange={handleChange}
-                className="mt-1 w-full"
+                accept="image/*"
+                className="mt-1 w-full border rounded px-4 py-2 border-gray-300"
               />
             </div>
             <div className="flex space-x-4">
               <button
                 type="submit"
-                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
                 disabled={submitLoading}
+                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors disabled:opacity-50"
               >
-                {submitLoading ? 'Updating...' : 'Update Profile'}
+                {submitLoading ? 'Saving...' : 'Save Changes'}
               </button>
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"
+                className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
               >
                 Cancel
               </button>
