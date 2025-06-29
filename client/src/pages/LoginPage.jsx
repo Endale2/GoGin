@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/authContext';
 import axiosInstance from '../utils/axios';
 
 const LoginPage = () => {
@@ -10,19 +11,14 @@ const LoginPage = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, login } = useAuth();
 
   useEffect(() => {
-    const checkAuthentication = async () => {
-      try {
-        // Try to verify if the user is already authenticated
-        await axiosInstance.get('/auth/me');
-        navigate('/home'); // Redirect if authenticated
-      } catch (error) {
-        // User is not authenticated, allow access to the login page
-      }
-    };
-    checkAuthentication();
-  }, [navigate]);
+    // If user is already authenticated, redirect to home
+    if (user) {
+      navigate('/home');
+    }
+  }, [user, navigate]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -70,13 +66,13 @@ const LoginPage = () => {
 
     setLoading(true);
     try {
-      // Attempt login and redirect on success
-      const response = await axiosInstance.post('/auth/login', {
+      // Use the login function from auth context
+      await login({
         email: formData.email.toLowerCase(),
         password: formData.password
       });
       
-      console.log('Login successful:', response.data);
+      console.log('Login successful');
       navigate('/home');
     } catch (error) {
       console.error('Login failed', error);

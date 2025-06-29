@@ -1,37 +1,72 @@
+// main.go
 package main
 
 import (
-	"go-gin/config"
-	"go-gin/routes"
+	"time"
 
-	"github.com/gin-contrib/cors"
+	"go-gin/config"
+	"go-gin/controllers"
+	"go-gin/routes"
+	"go-gin/websocket"
+
 	"github.com/gin-gonic/gin"
 )
 
+// Custom CORS middleware
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Debug logging
+		println("CORS middleware called for:", c.Request.Method, c.Request.URL.Path)
+
+		// Set CORS headers for all requests
+		c.Header("Access-Control-Allow-Origin", "http://localhost:5173")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Headers",
+			"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Header("Access-Control-Expose-Headers", "Content-Length")
+		c.Header("Access-Control-Max-Age", time.Duration(12*time.Hour).String())
+
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			println("Handling OPTIONS preflight request")
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func main() {
+	// Disable automatic trailing‑slash redirects (optional)
+	gin.DisableConsoleColor()
 	app := gin.Default()
+	app.RedirectTrailingSlash = false
 
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-	}))
-   
+	// 1) Apply CORS globally
+	app.Use(CORSMiddleware())
 
-	// Serve static files from the uploads directory
-	app.Static("/uploads", "./uploads")
-	
-	// Database connection
+	// 2) Initialize WebSocket hub
+	hub := websocket.NewHub()
+	go hub.Run()
+
+	// 3) Initialize database & controllers
 	config.ConnectDB()
+	controllers.InitCollections()
 
-	// Routes
+	// 4) Set WebSocket hub for controllers
+	controllers.SetHub(hub)
+
+	// 5) Static file serving
+	app.Static("/uploads", "./uploads")
+
+	// 6) All routes
 	routes.AuthRoutes(app)
-	routes.CourseRoutes(app)
-	routes.RecipeRoutes(app)
-	routes.QuestionRoutes(app)
-	routes.AnswerRoutes(app)
-	routes.ReplyRoutes(app)
+	routes.PostRoutes(app)
+	routes.CommentRoutes(app)
+	routes.WebSocketRoutes(app, hub)
 
+	// 7) Start server
 	app.Run(":8080")
 }

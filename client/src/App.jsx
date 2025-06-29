@@ -1,58 +1,37 @@
 // App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LoginPage from './pages/LoginPage';
-import RegistrationPage from './pages/RegisterPage';
-import HomePage from './pages/HomePage';
-import ProtectedRoute from './components/ProtectedRoute';
-import LandingPage from './pages/LandingPage';
-import QuestionDetail from './pages/QuestionDetail';
-import Layout from './components/Layout';
-import ProfilePage from './pages/ProfilePage';
-import UserProfilePage from './pages/UserProfilePage';
+import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
+import { WebSocketProvider } from './context/WebSocketContext';
+import Navbar from './components/Layout/Navbar';
+import Home from './pages/Home';
+import PostDetail from './pages/PostDetail';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import './index.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegistrationPage />} />
-        <Route path="/profile/:userId" element={<UserProfilePage />} />
-
-        {/* Layout for Protected Routes */}
-        <Route path="/" element={<Layout />}>
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile/me"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          
-
-          {/* Wrap QuestionDetail in ProtectedRoute as well */}
-          <Route
-            path="/questions/:id"
-            element={
-              <ProtectedRoute>
-                <QuestionDetail />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <WebSocketProvider>
+        <ChatProvider>
+          <Router>
+            <div className="min-h-screen bg-gray-50">
+              <Navbar />
+              <main className="container mx-auto px-4 py-8">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/post/:id" element={<PostDetail />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                </Routes>
+              </main>
+            </div>
+          </Router>
+        </ChatProvider>
+      </WebSocketProvider>
+    </AuthProvider>
   );
 }
 

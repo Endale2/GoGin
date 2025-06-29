@@ -32,6 +32,10 @@ func ConnectDB() {
 	fmt.Println("Connected to MongoDB!")
 }
 
+func GetContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 10*time.Second)
+}
+
 func DisconnectDB() {
 	if Client != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

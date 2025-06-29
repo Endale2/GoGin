@@ -1,32 +1,85 @@
-import React, { createContext, useState, useEffect } from 'react';
-import axios from '../utils/axios';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authAPI } from '../api/auth';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/auth/me').then((res) => {
-      setUser(res.data);
-    }).catch(() => {
-      setUser(null);
-    });
-  }, []);
+    const checkAuth = async () => {
+      if (token) {
+        try {
+          const userData = await authAPI.getCurrentUser(token);
+          setUser(userData);
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          localStorage.removeItem('token');
+          setToken(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, [token]);
 
   const login = async (credentials) => {
-    await axios.post('/auth/login', credentials, { withCredentials: true });
-    const { data } = await axios.get('/auth/me');
-    setUser(data);
+    try {
+      const response = await authAPI.login(credentials);
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem('token', response.token);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   };
 
-  const logout = () => {
+  const register = async (userData) => {
+    try {
+      const response = await authAPI.register(userData);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const logout = async () => {
+    if (token) {
+      try {
+        await authAPI.logout(token);
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
     setUser(null);
-    axios.post('/auth/logout', {}, { withCredentials: true });
+    setToken(null);
+    localStorage.removeItem('token');
+  };
+
+  const value = {
+    user,
+    token,
+    loading,
+    login,
+    register,
+    logout,
+    isAuthenticated: !!user,
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
