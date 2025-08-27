@@ -157,7 +157,7 @@ const Home = () => {
                   Try Again
                 </button>
               </div>
-            ) : posts.length === 0 ? (
+            ) : !posts || posts.length === 0 ? ( // <<<--- FIX IS HERE
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FiPlus className="w-8 h-8 text-gray-400" />
@@ -189,4 +189,4 @@ const Home = () => {
   );
 };
 
-export default Home; 
+export default Home;

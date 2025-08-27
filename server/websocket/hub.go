@@ -11,15 +11,15 @@ import (
 
 // Message types
 const (
-	MessageTypeVote        = "vote"
-	MessageTypeComment     = "comment"
-	MessageTypeReply       = "reply"
-	MessageTypeOnline      = "online"
-	MessageTypeOffline     = "offline"
-	MessageTypeTyping      = "typing"
-	MessageTypeStopTyping  = "stop_typing"
-	MessageTypeUserJoined  = "user_joined"
-	MessageTypeUserLeft    = "user_left"
+	MessageTypeVote       = "vote"
+	MessageTypeComment    = "comment"
+	MessageTypeReply      = "reply"
+	MessageTypeOnline     = "online"
+	MessageTypeOffline    = "offline"
+	MessageTypeTyping     = "typing"
+	MessageTypeStopTyping = "stop_typing"
+	MessageTypeUserJoined = "user_joined"
+	MessageTypeUserLeft   = "user_left"
 )
 
 // Message represents a WebSocket message
@@ -69,9 +69,9 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			
+
 			log.Printf("User joined: %s (%s), Total clients: %d", client.Username, client.UserID, len(h.clients))
-			
+
 			// Send current online users list to the new user
 			onlineUsers := h.GetOnlineUsers()
 			onlineUsersMsg := Message{
@@ -80,7 +80,7 @@ func (h *Hub) Run() {
 				Timestamp: time.Now(),
 			}
 			h.BroadcastToUser(client.UserID, onlineUsersMsg)
-			
+
 			// Broadcast user joined to all other users
 			h.broadcastMessage(Message{
 				Type:      MessageTypeUserJoined,
@@ -96,9 +96,9 @@ func (h *Hub) Run() {
 				close(client.Send)
 			}
 			h.mu.Unlock()
-			
+
 			log.Printf("User left: %s (%s), Total clients: %d", client.Username, client.UserID, len(h.clients))
-			
+
 			// Broadcast user left
 			h.broadcastMessage(Message{
 				Type:      MessageTypeUserLeft,
@@ -181,7 +181,7 @@ func (h *Hub) BroadcastToUser(userID string, msg Message) {
 func (h *Hub) GetOnlineUsers() []map[string]string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	users := make([]map[string]string, 0)
 	for client := range h.clients {
 		users = append(users, map[string]string{
@@ -206,6 +206,6 @@ func (h *Hub) broadcastMessage(msg Message) {
 		log.Printf("Error marshaling message: %v", err)
 		return
 	}
-	
+
 	h.broadcast <- data
-} 
+}
