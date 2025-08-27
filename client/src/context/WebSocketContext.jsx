@@ -33,10 +33,28 @@ export const WebSocketProvider = ({ children }) => {
 
       ws.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data);
-          handleMessage(message);
+          // Sometimes server sends multiple JSON messages separated by newlines.
+          // Split by newline and parse each piece. Also handle arrays.
+          const raw = event.data.toString();
+          const parts = raw.split('\n').map(p => p.trim()).filter(Boolean);
+          for (const part of parts) {
+            let parsed;
+            try {
+              parsed = JSON.parse(part);
+            } catch (e) {
+              // If it's not a JSON object, skip.
+              console.error('Error parsing part of WebSocket message:', e, part);
+              continue;
+            }
+
+            if (Array.isArray(parsed)) {
+              for (const msg of parsed) handleMessage(msg);
+            } else {
+              handleMessage(parsed);
+            }
+          }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('Error handling WebSocket message:', error);
         }
       };
 

@@ -108,16 +108,31 @@ func (h *Hub) Run() {
 			})
 
 		case message := <-h.broadcast:
+			// Send message to clients, but don't mutate the clients map while holding the read lock.
+			// Collect clients that need removal and perform deletions under write lock.
 			h.mu.RLock()
+			var toRemove []*Client
 			for client := range h.clients {
 				select {
 				case client.Send <- message:
+					// sent successfully
 				default:
-					close(client.Send)
-					delete(h.clients, client)
+					// mark for removal
+					toRemove = append(toRemove, client)
 				}
 			}
 			h.mu.RUnlock()
+
+			if len(toRemove) > 0 {
+				h.mu.Lock()
+				for _, client := range toRemove {
+					if _, ok := h.clients[client]; ok {
+						close(client.Send)
+						delete(h.clients, client)
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }
@@ -129,24 +144,36 @@ func (h *Hub) BroadcastMessage(msg Message) {
 
 // BroadcastToUser sends a message to a specific user
 func (h *Hub) BroadcastToUser(userID string, msg Message) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Error marshaling message: %v", err)
 		return
 	}
-	
+
+	// Collect clients that need removal to avoid mutating map under read lock
+	var toRemove []*Client
+	h.mu.RLock()
 	for client := range h.clients {
 		if client.UserID == userID {
 			select {
 			case client.Send <- data:
+				// sent
 			default:
+				toRemove = append(toRemove, client)
+			}
+		}
+	}
+	h.mu.RUnlock()
+
+	if len(toRemove) > 0 {
+		h.mu.Lock()
+		for _, client := range toRemove {
+			if _, ok := h.clients[client]; ok {
 				close(client.Send)
 				delete(h.clients, client)
 			}
 		}
+		h.mu.Unlock()
 	}
 }
 
