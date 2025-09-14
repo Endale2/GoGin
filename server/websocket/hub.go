@@ -66,14 +66,25 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
+			// Determine if this is the first connection for this user
 			h.mu.Lock()
+			prevCount := 0
+			for c := range h.clients {
+				if c.UserID == client.UserID {
+					prevCount++
+				}
+			}
+
+			// Register the client
 			h.clients[client] = true
 			h.mu.Unlock()
 
 			log.Printf("User joined: %s (%s), Total clients: %d", client.Username, client.UserID, len(h.clients))
 
-			// Send current online users list to the new user
-			onlineUsers := h.GetOnlineUsers()
+			// Build the deduplicated online users list
+			onlineUsers := h.GetUniqueOnlineUsers()
+
+			// Send current online users list to the new user (their own sockets)
 			onlineUsersMsg := Message{
 				Type:      "online_users",
 				Data:      onlineUsers,
@@ -81,31 +92,59 @@ func (h *Hub) Run() {
 			}
 			h.BroadcastToUser(client.UserID, onlineUsersMsg)
 
-			// Broadcast user joined to all other users
-			h.broadcastMessage(Message{
-				Type:      MessageTypeUserJoined,
-				UserID:    client.UserID,
-				Username:  client.Username,
-				Timestamp: time.Now(),
-			})
+			// If this is the first connection for this user, broadcast user joined and updated list to all users
+			if prevCount == 0 {
+				h.broadcastMessage(Message{
+					Type:      MessageTypeUserJoined,
+					UserID:    client.UserID,
+					Username:  client.Username,
+					Timestamp: time.Now(),
+				})
+
+				// Broadcast updated deduplicated list to everyone
+				h.broadcastMessage(Message{
+					Type:      "online_users",
+					Data:      onlineUsers,
+					Timestamp: time.Now(),
+				})
+			}
 
 		case client := <-h.unregister:
+			// Remove the client and check if any other connections for same user remain
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.Send)
 			}
+
+			// Count remaining connections for this user
+			remaining := 0
+			for c := range h.clients {
+				if c.UserID == client.UserID {
+					remaining++
+				}
+			}
 			h.mu.Unlock()
 
 			log.Printf("User left: %s (%s), Total clients: %d", client.Username, client.UserID, len(h.clients))
 
-			// Broadcast user left
-			h.broadcastMessage(Message{
-				Type:      MessageTypeUserLeft,
-				UserID:    client.UserID,
-				Username:  client.Username,
-				Timestamp: time.Now(),
-			})
+			// Broadcast user left only when no remaining connections for that user
+			if remaining == 0 {
+				h.broadcastMessage(Message{
+					Type:      MessageTypeUserLeft,
+					UserID:    client.UserID,
+					Username:  client.Username,
+					Timestamp: time.Now(),
+				})
+
+				// Broadcast updated deduplicated list to everyone
+				onlineUsers := h.GetUniqueOnlineUsers()
+				h.broadcastMessage(Message{
+					Type:      "online_users",
+					Data:      onlineUsers,
+					Timestamp: time.Now(),
+				})
+			}
 
 		case message := <-h.broadcast:
 			// Send message to clients, but don't mutate the clients map while holding the read lock.
@@ -197,6 +236,26 @@ func (h *Hub) GetOnlineCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+// GetUniqueOnlineUsers returns list of unique online users (deduplicated by UserID)
+func (h *Hub) GetUniqueOnlineUsers() []map[string]string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	seen := make(map[string]bool)
+	users := make([]map[string]string, 0)
+	for client := range h.clients {
+		if _, ok := seen[client.UserID]; ok {
+			continue
+		}
+		seen[client.UserID] = true
+		users = append(users, map[string]string{
+			"id":       client.UserID,
+			"username": client.Username,
+		})
+	}
+	return users
 }
 
 // broadcastMessage is a helper function to broadcast messages

@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+const apiBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:8080';
+
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080',
-  withCredentials: true,  
+  baseURL: apiBase,
+  withCredentials: true,
 });
 
 axiosInstance.interceptors.response.use(

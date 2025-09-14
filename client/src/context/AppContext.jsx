@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 import axiosInstance from '../utils/axios';
 
 const AppContext = createContext();
@@ -149,8 +149,8 @@ function appReducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // API functions
-  const api = {
+  // API functions (memoized so reference is stable for consumers)
+  const api = useMemo(() => ({
     // Posts (previously questions)
     fetchQuestions: async (filters = {}) => {
       try {
@@ -163,7 +163,7 @@ export function AppProvider({ children }) {
         if (filters.sort) params.append('sort', filters.sort);
         if (filters.type) params.append('type', filters.type);
 
-        const url = `/posts?${params.toString()}`;
+  const url = `/posts/?${params.toString()}`;
         console.log('API URL:', url);
         
         const response = await axiosInstance.get(url);
@@ -183,7 +183,7 @@ export function AppProvider({ children }) {
         });
         dispatch({ type: ACTIONS.SET_ERROR, payload: error.message });
       }
-    },
+  },
 
     fetchAnswers: async (questionId) => {
       try {
@@ -200,7 +200,7 @@ export function AppProvider({ children }) {
 
     createQuestion: async (questionData) => {
       try {
-        const response = await axiosInstance.post('/posts', questionData);
+  const response = await axiosInstance.post('/posts/', questionData);
         dispatch({ type: ACTIONS.ADD_QUESTION, payload: response.data });
         return response.data;
       } catch (error) {
@@ -386,7 +386,7 @@ export function AppProvider({ children }) {
         throw error;
       }
     }
-  };
+  }), [dispatch]);
 
   const value = {
     ...state,

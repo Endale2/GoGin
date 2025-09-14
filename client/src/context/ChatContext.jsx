@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { postsAPI } from '../api/posts';
 import { commentsAPI } from '../api/comments';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../authContext';
 
 const ChatContext = createContext();
 

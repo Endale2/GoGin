@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../authContext';
+import ConnectionStatus from './ConnectionStatus';
 import { FiHome, FiLogOut, FiUser } from 'react-icons/fi';
 
 const Navbar = () => {
@@ -26,6 +27,9 @@ const Navbar = () => {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-4">
+            <div className="mr-4">
+              <ConnectionStatus />
+            </div>
             {isAuthenticated ? (
               <>
                 <Link

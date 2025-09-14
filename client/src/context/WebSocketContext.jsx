@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../authContext';
 
 const WebSocketContext = createContext();
 
@@ -16,25 +16,58 @@ export const WebSocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [lastError, setLastError] = useState(null);
+  const [lastClose, setLastClose] = useState(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+
+  const getWsBase = () => {
+    // Prefer explicit env var VITE_WS_URL (e.g. ws://localhost:8080/ws)
+    const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_URL) || null;
+    if (envUrl) return envUrl;
+
+    const loc = window.location;
+    const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = loc.hostname || 'localhost';
+    // default backend port
+    const port = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_PORT) || '8080';
+    return `${protocol}//${host}:${port}/ws`;
+  };
 
   const connect = () => {
     if (!user || !token) return;
 
     try {
-      const ws = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+      // Build URL at connect time so token is fresh
+      const base = getWsBase();
+      const separator = base.includes('?') ? '&' : '?';
+      const url = `${base}${separator}token=${encodeURIComponent(token)}`;
+
+      // Close previous socket if any
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch (e) { /* ignore */ }
+        wsRef.current = null;
+      }
+
+      const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected to', url);
         setIsConnected(true);
+        // reset reconnect attempts
+        reconnectAttemptsRef.current = 0;
+        setReconnectAttempts(0);
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
       };
 
       ws.onmessage = (event) => {
         try {
-          // Sometimes server sends multiple JSON messages separated by newlines.
-          // Split by newline and parse each piece. Also handle arrays.
           const raw = event.data.toString();
           const parts = raw.split('\n').map(p => p.trim()).filter(Boolean);
           for (const part of parts) {
@@ -42,7 +75,6 @@ export const WebSocketProvider = ({ children }) => {
             try {
               parsed = JSON.parse(part);
             } catch (e) {
-              // If it's not a JSON object, skip.
               console.error('Error parsing part of WebSocket message:', e, part);
               continue;
             }
@@ -58,23 +90,28 @@ export const WebSocketProvider = ({ children }) => {
         }
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (evt) => {
+        console.log('WebSocket disconnected', evt && evt.code ? `code=${evt.code}` : '');
         setIsConnected(false);
-        
-        // Attempt to reconnect after 3 seconds
+        setLastClose({ code: evt?.code, reason: evt?.reason });
+
+        // Schedule reconnect with exponential backoff
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
         }
+        reconnectAttemptsRef.current = Math.min((reconnectAttemptsRef.current || 0) + 1, 10);
+        setReconnectAttempts(reconnectAttemptsRef.current);
+        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptsRef.current - 1));
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (user && token) {
-            connect();
-          }
-        }, 3000);
+          if (user && token) connect();
+        }, delay);
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        setLastError(error?.toString ? error.toString() : String(error));
+        // some environments don't trigger onclose after error; ensure socket is closed to trigger reconnect logic
+        try { ws.close(); } catch (e) { /* ignore */ }
         setIsConnected(false);
       };
 
@@ -96,8 +133,15 @@ export const WebSocketProvider = ({ children }) => {
   };
 
   const sendMessage = (message) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
+    try {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(message));
+      } else {
+        console.warn('WebSocket not open, cannot send message');
+      }
+    } catch (err) {
+      console.error('Error sending WebSocket message:', err);
+      setLastError(err?.toString ? err.toString() : String(err));
     }
   };
 
@@ -232,6 +276,11 @@ export const WebSocketProvider = ({ children }) => {
     sendMessage,
     sendTyping,
     sendStopTyping,
+    connect,
+    disconnect,
+    reconnectAttempts,
+    lastError,
+    lastClose,
   };
 
   return (

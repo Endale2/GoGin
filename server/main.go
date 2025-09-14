@@ -2,6 +2,7 @@
 package main
 
 import (
+	"os"
 	"time"
 
 	"go-gin/config"
@@ -68,5 +69,10 @@ func main() {
 	routes.WebSocketRoutes(app, hub)
 
 	// 7) Start server
-	app.Run(":8080")
+	// Allow override with PORT environment variable for local testing
+	port := ":8080"
+	if p := os.Getenv("PORT"); p != "" {
+		port = ":" + p
+	}
+	app.Run(port)
 }

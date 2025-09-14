@@ -11,7 +11,7 @@ export const postsAPI = {
     if (sort) params.append('sort', sort);
     if (search) params.append('search', search);
     
-    const response = await fetch(`${API_BASE}/posts?${params.toString()}`, {
+    const response = await fetch(`${API_BASE}/posts/?${params.toString()}`, {
       credentials: 'include',
     });
     
@@ -55,7 +55,7 @@ export const postsAPI = {
   },
 
   async createPost(postData, token) {
-    const response = await fetch(`${API_BASE}/posts`, {
+    const response = await fetch(`${API_BASE}/posts/`, {
       method: 'POST',
       headers: getAuthHeaders(token),
       credentials: 'include',
@@ -135,8 +135,9 @@ export const postsAPI = {
 
   async unsavePost(id) {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE}/posts/${id}/unsave`, {
-      method: 'POST',
+    // Backend expects DELETE /posts/:id/save to unsave
+    const response = await fetch(`${API_BASE}/posts/${id}/save`, {
+      method: 'DELETE',
       headers: getAuthHeaders(token),
       credentials: 'include',
     });
