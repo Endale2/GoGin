@@ -200,7 +200,12 @@ export function AppProvider({ children }) {
 
     createQuestion: async (questionData) => {
       try {
-  const response = await axiosInstance.post('/posts/', questionData);
+        const token = localStorage.getItem('token');
+        console.log('Creating question with token present?', !!token, questionData);
+        const response = await axiosInstance.post('/posts/', questionData, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        console.log('Create question response:', response.status, response.data);
         dispatch({ type: ACTIONS.ADD_QUESTION, payload: response.data });
         return response.data;
       } catch (error) {

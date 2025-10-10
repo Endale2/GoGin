@@ -7,6 +7,22 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
+// Attach Authorization header if token exists in localStorage
+axiosInstance.interceptors.request.use((config) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers = config.headers || {};
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+  } catch (err) {
+    // ignore localStorage errors
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {

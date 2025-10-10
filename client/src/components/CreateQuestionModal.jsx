@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../authContext';
+import { useNavigate } from 'react-router-dom';
 
 const CreateQuestionModal = ({ isOpen, onClose, courses = [], universities = [], departments = [] }) => {
   const { api } = useApp();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     content: '',
     courseId: '',
@@ -17,6 +21,13 @@ const CreateQuestionModal = ({ isOpen, onClose, courses = [], universities = [],
     e.preventDefault();
     if (!form.content.trim() || !form.courseId) return;
 
+    // Must be authenticated to post
+    if (!user) {
+      // Redirect to login
+      navigate('/login');
+      return;
+    }
+
     setLoading(true);
     try {
       const questionData = {
@@ -29,7 +40,7 @@ const CreateQuestionModal = ({ isOpen, onClose, courses = [], universities = [],
       if (form.universityId) questionData.university_id = form.universityId;
       if (form.departmentId) questionData.department_id = form.departmentId;
 
-      await api.createQuestion(questionData);
+  await api.createQuestion(questionData);
       
       // Reset form
       setForm({
@@ -44,6 +55,12 @@ const CreateQuestionModal = ({ isOpen, onClose, courses = [], universities = [],
       onClose();
     } catch (error) {
       console.error('Failed to create question:', error);
+      // Try to show server message if available
+      if (error?.response?.data) {
+        alert('Failed to post: ' + (error.response.data.error || JSON.stringify(error.response.data)));
+      } else {
+        alert('Failed to post: ' + (error.message || 'Unknown error'));
+      }
     } finally {
       setLoading(false);
     }

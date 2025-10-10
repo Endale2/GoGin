@@ -37,7 +37,10 @@ export const WebSocketProvider = ({ children }) => {
   };
 
   const connect = () => {
-    if (!user || !token) return;
+    if (!user || !token) {
+      console.log('WebSocket connect skipped, missing user or token', { user, token });
+      return;
+    }
 
     try {
       // Build URL at connect time so token is fresh
