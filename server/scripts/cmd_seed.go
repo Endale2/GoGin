@@ -1,7 +1,7 @@
 package main
 
-import "ventapp/server/ventapp/scripts/util"
+import "ventapp/server/scripts/util"
 
 func main() {
-    util.RunSeed()
+	util.RunSeed()
 }

@@ -1,5 +1,5 @@
-package util
+package main
 
-// Legacy seeding script removed. This file is retained to avoid accidental
-// `go build ./...` failures in environments that include the scripts package.
-// Use populate_vents.go for seeding vents data instead.
+// Legacy seeding helper removed. This placeholder keeps the scripts directory
+// buildable when running `go build ./...`. Use `go run ./server/scripts/cmd_seed.go`
+// to run the seeder which calls the implementation in scripts/util/populate.go.

@@ -19,6 +19,10 @@ type CreateVentRequest struct {
 	AuthorID string   `json:"author_id" binding:"required"`
 	Content  string   `json:"content" binding:"required,min=1"`
 	Tags     []string `json:"tags"`
+	// Optional related IDs passed as hex string; convert on server if present
+	CourseID     *string `json:"course_id,omitempty"`
+	UniversityID *string `json:"university_id,omitempty"`
+	DepartmentID *string `json:"department_id,omitempty"`
 }
 
 func CreateVent(c *gin.Context) {
@@ -34,6 +38,10 @@ func CreateVent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid author_id"})
 		return
 	}
+
+	// Note: optional related IDs (course/university/department) are accepted in the
+	// request but not yet stored in the Vent model. If you add corresponding fields
+	// to models.Vent, convert them with primitive.ObjectIDFromHex and set here.
 
 	vent := &models.Vent{
 		AuthorID:  authorOID,
