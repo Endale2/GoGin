@@ -27,7 +27,6 @@ func main() {
 
 	r := gin.Default()
 
-
 	// attach JWT middleware globally (it will be permissive: allows anonymous)
 	r.Use(middleware.JWTAuth())
 
