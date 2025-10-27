@@ -6,6 +6,8 @@ import (
 
 	"ventapp/server/ventapp/config"
 	"ventapp/server/ventapp/controllers"
+	authControllers "ventapp/server/ventapp/controllers"
+	"ventapp/server/ventapp/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +26,20 @@ func main() {
 	defer config.Disconnect()
 
 	r := gin.Default()
+
+
+
+
+	
+	// attach JWT middleware globally (it will be permissive: allows anonymous)
+	r.Use(middleware.JWTAuth())
+
+	// Auth routes
+	auth := r.Group("/auth")
+	{
+		auth.POST("/register", authControllers.Register)
+		auth.POST("/login", authControllers.Login)
+	}
 
 	// Posts (vents) routes
 	posts := r.Group("/posts")
